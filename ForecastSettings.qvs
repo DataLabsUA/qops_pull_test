@@ -1,0 +1,48 @@
+/*************************************************************************
+* 
+* Ansell Healthcare, LLC
+* DVSTS Ltd.
+* CONFIDENTIAL
+* __________________
+* 
+* 2016 Ansell Healthcare, LLC 
+* 2016 DVSTS Ltd. 
+* All Rights Reserved.
+* 
+* NOTICE:  All information contained herein is, and remains
+* the property of Ansell Healthcare, LLC and DVSTS Ltd. The
+* intellectual and technical concepts contained herein are
+* proprietary to Ansell Healthcare, LLC and DVSTS Ltd. and
+* may be covered by U.S. and Foreign Patents, patents in
+* process, and are protected by trade secret or copyright
+* law. Dissemination of this information or reproduction of
+* this material is strictly forbidden unless prior written
+* permission is obtained from Ansell Healthcare, LLC.
+*************************************************************************/
+ 
+/*
+This script transforms next feeds:
+
+MASETR\FORECAST *\FORECAST*.XLSX
+into "FORECAST-*.qvd"
+*/
+
+//Generic folders for sources and result files
+SET vSrcPath = \\ansqlik4\QlikviewAuto\SalesMargin\;
+SET vSrcPathPBCS = \\brufps1\Groups\QV\Interfaces\PBCS\GIS_Budget;
+//doesn't work with \ at the end
+SET vQVDPath = ..\_QVD\;
+SET vLOGPath = ..\_LOG\;
+SET vINCPath = ..\_Includes\;
+SET vEmailPath = ..\_EMAIL\;
+
+// Logs Mover Addon integration and settings
+SET vLogRetentionPeriod = 2;
+SET vLogsFolder = '.\ForecastReloadLogs';
+SET v7zFolder = '$(vINCPath)7z';
+$(Include=$(v7zFolder)\LogsMover.qvs);
+
+EXECUTE powershell -Command "& {remove-item '$(vQVDPath)Forecast-*.qvd' -Force}";
+
+//Incremental settings
+$(Include=.\IncrementalSettings.qvs);

@@ -1,0 +1,86 @@
+/*************************************************************************
+* 
+* Ansell Healthcare, LLC
+* DVSTS Ltd.
+* CONFIDENTIAL
+* __________________
+* 
+* 2016 Ansell Healthcare, LLC 
+* 2016 DVSTS Ltd. 
+* All Rights Reserved.
+* 
+* NOTICE:  All information contained herein is, and remains
+* the property of Ansell Healthcare, LLC and DVSTS Ltd. The
+* intellectual and technical concepts contained herein are
+* proprietary to Ansell Healthcare, LLC and DVSTS Ltd. and
+* may be covered by U.S. and Foreign Patents, patents in
+* process, and are protected by trade secret or copyright
+* law. Dissemination of this information or reproduction of
+* this material is strictly forbidden unless prior written
+* permission is obtained from Ansell Healthcare, LLC.
+*************************************************************************/
+ 
+/*
+This script transforms next feeds:
+
+MASTER\ORIGIN MASTER*.XLSX
+into "OriginMaster.qvd"
+
+MASTER\LEGAL ENTITY MASTER.XLS
+into "Entity.qvd"
+
+MASTER\PRODUCT DIVISION - GBU*.XLS
+into "GBU.qvd"
+
+MDM FILTER.XLSX
+into "MDM Filter.qvd"
+
+NEW PRODUCT MASTER_GBU_DIVISION\FINAL\PRODUCT MASTER*.XLSX
+NEW PRODUCT MASTER_GBU_DIVISION\FINAL\MICROGARD*.XLSX
+with addition of "GBU.qvd" and "MDM Filter.qvd"
+into "Product.qvd"
+
+APAC\APAC MASTERS\CUSTOMER*.XLSX
+APAC\RAMCO\MASTER\CUSTOMER*.QVD
+APS\MASTERS\CUSTOMER*.XLSX
+BSSI AUTOMATED\BSSI SALES & CUSTOMER MASTER QVD\CUSTOMER MASTER\CUSTOMER*.QVD
+EMEA DATAUSING IN GIS\EMEA MASTER\CUSTOMER*.XLSX
+EMEA DATAUSING IN GIS\SAP MASTER\CUSTOMER.QVD
+MASTER\CUSTOMER MASTER*.XLSX
+MASTER\CUSTOMER*.XLSX
+MASTER\GLOBAL CUSTOMER MASTER\GLOBAL CUSTOMER MASTER.XLSX
+MASTER\SANDEL MASTER\SANDELMASTER QVD\SANDELCUSTOMER.QVD
+MICROGARD\MICROGARD CUSTOMER MASTER\CUSTOMER*.XLSX
+into "Customer.qvd"
+
+APAC\APAC MASTERS\CUSTOMER*.XLSX
+APAC\RAMCO\MASTER\SHIPTO*.QVD
+APS\MASTERS\CUSTOMER*.XLSX
+BSSI AUTOMATED\BSSI SALES & CUSTOMER MASTER QVD\CUSTOMER MASTER\SHIPTO_MASTER*.QVD
+EMEA DATAUSING IN GIS\EMEA MASTER\CUSTOMER*.XLSX
+EMEA DATAUSING IN GIS\SAP MASTER\CUSTOMERSUBREGION*.QVD
+MASTER\CUSTOMER*.XLSX
+MASTER\SANDEL MASTER\SANDELMASTER QVD\SANDELSHIPTOMASTER.QVD
+MICROGARD\MICROGARD CUSTOMER MASTER\CUSTOMER*.XLSX
+into "CustomerSubRegion.qvd"
+
+EMEA DATAUSING IN GIS\EMEA MASTER\CUSTOMER*.XLSX
+into "Territory.qvd"
+*/
+
+//Generic folders for sources and result files
+SET vSrcPath = \\ansqlik4\QlikviewAuto\SalesMargin\;
+SET vSrcPathPBCS = \\brufps1\Groups\QV\Interfaces\PBCS\GIS_Budget\;
+SET vQVDPath = ..\_QVD\;
+SET vLOGPath = ..\_LOG\;
+SET vINCPath = ..\_Includes\;
+SET vEmailPath = ..\_EMAIL\;
+
+// Logs Mover Addon integration and settings
+SET vLogRetentionPeriod = 2;
+SET vLogsFolder = '.\MastersReloadLogs';
+SET v7zFolder = '$(vINCPath)7z';
+$(Include=$(v7zFolder)\LogsMover.qvs);
+
+//Incremental settings
+$(Include=.\IncrementalSettings.qvs);
