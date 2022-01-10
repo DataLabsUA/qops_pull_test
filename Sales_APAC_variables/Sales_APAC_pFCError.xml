@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>pFCError</Name>
+    <Content>Expected to have "SALES_BSSI[YYYYMM].QVD" or "SALES_OGI[YYYYMM].QVD"</Content>
+  </Variable>
+</Variables>

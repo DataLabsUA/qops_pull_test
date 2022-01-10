@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vLogsFolder</Name>
+    <Content>.\Sales_PRMSReloadLogs</Content>
+  </Variable>
+</Variables>

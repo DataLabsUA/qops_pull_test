@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vLogDocPrefixName</Name>
+    <Content>Log_HFM_</Content>
+  </Variable>
+</Variables>

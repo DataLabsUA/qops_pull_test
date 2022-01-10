@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>TimestampFormat</Name>
+    <Content>MM/DD/YYYY hh:mm:ss[.fff]</Content>
+  </Variable>
+</Variables>

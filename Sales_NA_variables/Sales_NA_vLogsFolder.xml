@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vLogsFolder</Name>
+    <Content>.\Sales_NAReloadLogs</Content>
+  </Variable>
+</Variables>

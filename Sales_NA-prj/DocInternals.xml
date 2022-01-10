@@ -1,0 +1,540 @@
+﻿<DocInternals>
+  <AlwaysLoose>
+    <bool>false</bool>
+    <bool>false</bool>
+    <bool>false</bool>
+    <bool>false</bool>
+  </AlwaysLoose>
+  <FieldSrcTables>
+    <String>6</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>7</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>8</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>9</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>10</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>11</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>12</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>13</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>14</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>15</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>16</String>
+    <String>1</String>
+    <String>LOG</String>
+  </FieldSrcTables>
+  <TableViewData>
+    <Pos></Pos>
+    <CtlInfo>
+      <InternalView>
+        <Tables>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>323</Left>
+              <Top>190</Top>
+              <Width>100</Width>
+              <Height>100</Height>
+            </Pos>
+            <Caption>GBU</Caption>
+          </TableViewTableWinSaveInfo>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>323</Left>
+              <Top>342</Top>
+              <Width>100</Width>
+              <Height>208</Height>
+            </Pos>
+            <Caption>Product</Caption>
+          </TableViewTableWinSaveInfo>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>944</Left>
+              <Top>244</Top>
+              <Width>100</Width>
+              <Height>118</Height>
+            </Pos>
+            <Caption>LOG</Caption>
+          </TableViewTableWinSaveInfo>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>323</Left>
+              <Top>57</Top>
+              <Width>100</Width>
+              <Height>82</Height>
+            </Pos>
+            <Caption>$Syn 1 Table</Caption>
+          </TableViewTableWinSaveInfo>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>633</Left>
+              <Top>200</Top>
+              <Width>100</Width>
+              <Height>208</Height>
+            </Pos>
+            <Caption>Sales_Shipment</Caption>
+          </TableViewTableWinSaveInfo>
+        </Tables>
+        <BroomPoints></BroomPoints>
+        <ConnectionPoints></ConnectionPoints>
+        <ZoomFactor>3FF0000000000000</ZoomFactor>
+      </InternalView>
+      <SourceView></SourceView>
+    </CtlInfo>
+    <Mode>0</Mode>
+  </TableViewData>
+  <Bookmarks></Bookmarks>
+  <SavedByVersion>12.20.20800.0</SavedByVersion>
+  <ForceBackEndMacroExecution>false</ForceBackEndMacroExecution>
+  <FieldTags>
+    <ScriptBased>
+      <FieldTagData>
+        <Tag>$hidden</Tag>
+        <FieldNames>
+          <String>$Field</String>
+          <String>$Table</String>
+          <String>$Rows</String>
+          <String>$Fields</String>
+          <String>$FieldNo</String>
+          <String>$Info</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$system</Tag>
+        <FieldNames>
+          <String>$Field</String>
+          <String>$Table</String>
+          <String>$Rows</String>
+          <String>$Fields</String>
+          <String>$FieldNo</String>
+          <String>$Info</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$ascii</Tag>
+        <FieldNames>
+          <String>f_pFTM_IgnoreFile</String>
+          <String>Module</String>
+          <String>TABLE</String>
+          <String>STATUS</String>
+          <String>MESSAGE</String>
+          <String>Trxn Currency</String>
+          <String>COGS Trxn Currency</String>
+          <String>LocalCurrency</String>
+          <String>Currency</String>
+          <String>Doc Type</String>
+          <String>U/M</String>
+          <String>FN</String>
+          <String>FinalCurrency</String>
+          <String>COGS_FinalCurrency</String>
+          <String>CompoundKey</String>
+          <String>Entity</String>
+          <String>Customer Number</String>
+          <String>Product Number</String>
+          <String>CustomerShipToAddressID</String>
+          <String>MonthStoreFlag</String>
+          <String>Source Name</String>
+          <String>Flag</String>
+          <String>SI_FN</String>
+          <String>2021</String>
+          <String>SHIPTO_DEL_LOC_ID</String>
+          <String>ShipToDeliveryLocationID</String>
+          <String>Orginal Invoice</String>
+          <String>Inventory Org</String>
+          <String>Order Number</String>
+          <String>Address Number</String>
+          <String>Invoice Number</String>
+          <String>Settlement Discount LC.src</String>
+          <String>Co-op Rebate LC.src</String>
+          <String>Rebates LC.src</String>
+          <String>Volume Discount LC.src</String>
+          <String>BOGO.src</String>
+          <String>Slotting.src</String>
+          <String>TPR.src</String>
+          <String>Other.src</String>
+          <String>Offer #.src</String>
+          <String>FromValue</String>
+          <String>Sales Quantity</String>
+          <String>GROSS Sales Amount   LC</String>
+          <String>Returns LC.src</String>
+          <String>Sales Cost Amount LC (net see thru).src</String>
+          <String>Sales Cost Amount Legal Entity.src</String>
+          <String>ShipToDeliveryLocationID.src</String>
+          <String>Offer #</String>
+          <String>File name</String>
+          <String>FILENAME</String>
+          <String>$Field</String>
+          <String>$Table</String>
+          <String>$Info</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$text</Tag>
+        <FieldNames>
+          <String>f_pFTM_IgnoreFile</String>
+          <String>Module</String>
+          <String>TABLE</String>
+          <String>STATUS</String>
+          <String>MESSAGE</String>
+          <String>Trxn Currency</String>
+          <String>COGS Trxn Currency</String>
+          <String>LocalCurrency</String>
+          <String>Currency</String>
+          <String>Doc Type</String>
+          <String>U/M</String>
+          <String>FN</String>
+          <String>FinalCurrency</String>
+          <String>COGS_FinalCurrency</String>
+          <String>CompoundKey</String>
+          <String>Entity</String>
+          <String>Customer Number</String>
+          <String>Product Number</String>
+          <String>CustomerShipToAddressID</String>
+          <String>MonthStoreFlag</String>
+          <String>Source Name</String>
+          <String>Flag</String>
+          <String>SI_FN</String>
+          <String>2021</String>
+          <String>SHIPTO_DEL_LOC_ID</String>
+          <String>ShipToDeliveryLocationID</String>
+          <String>Orginal Invoice</String>
+          <String>Inventory Org</String>
+          <String>Order Number</String>
+          <String>Address Number</String>
+          <String>Invoice Number</String>
+          <String>Settlement Discount LC.src</String>
+          <String>Co-op Rebate LC.src</String>
+          <String>Rebates LC.src</String>
+          <String>Volume Discount LC.src</String>
+          <String>BOGO.src</String>
+          <String>Slotting.src</String>
+          <String>TPR.src</String>
+          <String>Other.src</String>
+          <String>Offer #.src</String>
+          <String>FromValue</String>
+          <String>Sales Quantity</String>
+          <String>GROSS Sales Amount   LC</String>
+          <String>Returns LC.src</String>
+          <String>Sales Cost Amount LC (net see thru).src</String>
+          <String>Sales Cost Amount Legal Entity.src</String>
+          <String>ShipToDeliveryLocationID.src</String>
+          <String>Offer #</String>
+          <String>File name</String>
+          <String>FILENAME</String>
+          <String>$Field</String>
+          <String>$Table</String>
+          <String>$Info</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$numeric</Tag>
+        <FieldNames>
+          <String>ReloadTime</String>
+          <String>SHIPTO_DLY_LOC_ID</String>
+          <String>Orginal Invoice</String>
+          <String>Inventory Org</String>
+          <String>Order Number</String>
+          <String>Address Number</String>
+          <String>Invoice Number</String>
+          <String>SALES_QUANTITY</String>
+          <String>GROSS_SALES_AMOUNT_LC</String>
+          <String>RETURNS_LC</String>
+          <String>SALES_COST_AMOUNT_LC</String>
+          <String>GROSS_SALES_AMOUNT_DOC</String>
+          <String>SALES_COST_AMOUNT_DOC</String>
+          <String>SALES_COST_AMOUNT_LE_DOC</String>
+          <String>SALES_COST_AMOUNT_LE</String>
+          <String>RN</String>
+          <String>ShipToDeliveryLocationID</String>
+          <String>Ship Date</String>
+          <String>Invoice Date</String>
+          <String>Promised Delivery Date</String>
+          <String>Date</String>
+          <String>Sales Qty</String>
+          <String>GROSS Sales Amount LC</String>
+          <String>Returns LC</String>
+          <String>Sales Cost Amount LC (net see thru)</String>
+          <String>Trxn Sales Amount</String>
+          <String>Trxn COGS Amount</String>
+          <String>BASE_COGS</String>
+          <String>COST_LE</String>
+          <String>Settlement Discount LC</String>
+          <String>Trans Type</String>
+          <String>Co-op Rebate LC</String>
+          <String>Rebates LC</String>
+          <String>Volume Discount LC</String>
+          <String>BOGO</String>
+          <String>Slotting</String>
+          <String>TPR</String>
+          <String>Other</String>
+          <String>COGS Adj 1 LC</String>
+          <String>COGS Adj 2 LC</String>
+          <String>Type of Discount #</String>
+          <String>Type of Discount Name</String>
+          <String>Offer #</String>
+          <String>QC</String>
+          <String>REC_NO</String>
+          <String>ToValue</String>
+          <String>REBATES_LC</String>
+          <String>VOLUME_DISCOUNT_LC</String>
+          <String>OFFER</String>
+          <String>Doc Type</String>
+          <String>Trxn Currency</String>
+          <String>COGS Trxn Currency</String>
+          <String>Sales Quantity</String>
+          <String>GROSS Sales Amount   LC</String>
+          <String>Returns LC.src</String>
+          <String>Sales Cost Amount LC (net see thru).src</String>
+          <String>Sales Cost Amount Legal Entity.src</String>
+          <String>Settlement Discount LC.src</String>
+          <String>Co-op Rebate LC.src</String>
+          <String>Rebates LC.src</String>
+          <String>Volume Discount LC.src</String>
+          <String>BOGO.src</String>
+          <String>Slotting.src</String>
+          <String>TPR.src</String>
+          <String>Other.src</String>
+          <String>Sales Qty.src</String>
+          <String>Sales</String>
+          <String>Total_Cost</String>
+          <String>Trxn Sales Amount.src</String>
+          <String>Co-op Rebate LC.rsc</String>
+          <String>COGS Adj 1 LC.src</String>
+          <String>COGS Adj 2 LC.src</String>
+          <String>LOG.RN</String>
+          <String>QtyWorning</String>
+          <String>$Rows</String>
+          <String>$Fields</String>
+          <String>$FieldNo</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$timestamp</Tag>
+        <FieldNames>
+          <String>ReloadTime</String>
+          <String>Invoice Date</String>
+          <String>Promised Delivery Date</String>
+          <String>Date</String>
+          <String>Ship Date</String>
+          <String>Invoice Number</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$integer</Tag>
+        <FieldNames>
+          <String>SHIPTO_DLY_LOC_ID</String>
+          <String>Orginal Invoice</String>
+          <String>Inventory Org</String>
+          <String>Order Number</String>
+          <String>Address Number</String>
+          <String>Invoice Number</String>
+          <String>RN</String>
+          <String>ShipToDeliveryLocationID</String>
+          <String>Ship Date</String>
+          <String>Invoice Date</String>
+          <String>Promised Delivery Date</String>
+          <String>Date</String>
+          <String>Settlement Discount LC</String>
+          <String>Trans Type</String>
+          <String>Co-op Rebate LC</String>
+          <String>Rebates LC</String>
+          <String>Volume Discount LC</String>
+          <String>BOGO</String>
+          <String>Slotting</String>
+          <String>TPR</String>
+          <String>Other</String>
+          <String>COGS Adj 1 LC</String>
+          <String>COGS Adj 2 LC</String>
+          <String>Type of Discount #</String>
+          <String>Type of Discount Name</String>
+          <String>Offer #</String>
+          <String>QC</String>
+          <String>REC_NO</String>
+          <String>ToValue</String>
+          <String>OFFER</String>
+          <String>Doc Type</String>
+          <String>Sales Qty</String>
+          <String>GROSS Sales Amount LC</String>
+          <String>Returns LC</String>
+          <String>Sales Cost Amount LC (net see thru)</String>
+          <String>Trxn Sales Amount</String>
+          <String>Trxn COGS Amount</String>
+          <String>BASE_COGS</String>
+          <String>COST_LE</String>
+          <String>Trxn Currency</String>
+          <String>COGS Trxn Currency</String>
+          <String>Sales Quantity</String>
+          <String>Returns LC.src</String>
+          <String>Settlement Discount LC.src</String>
+          <String>Co-op Rebate LC.src</String>
+          <String>Rebates LC.src</String>
+          <String>Volume Discount LC.src</String>
+          <String>BOGO.src</String>
+          <String>Slotting.src</String>
+          <String>TPR.src</String>
+          <String>Other.src</String>
+          <String>Co-op Rebate LC.rsc</String>
+          <String>COGS Adj 1 LC.src</String>
+          <String>COGS Adj 2 LC.src</String>
+          <String>LOG.RN</String>
+          <String>QtyWorning</String>
+          <String>$Rows</String>
+          <String>$Fields</String>
+          <String>$FieldNo</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$key</Tag>
+        <FieldNames>
+          <String>FN</String>
+          <String>RN</String>
+          <String>Trxn Currency</String>
+          <String>COGS Trxn Currency</String>
+          <String>FinalCurrency</String>
+          <String>COGS_FinalCurrency</String>
+          <String>LocalCurrency</String>
+          <String>Currency</String>
+          <String>CompoundKey</String>
+          <String>Entity</String>
+          <String>Customer Number</String>
+          <String>Product Number</String>
+          <String>SHIPTO_DLY_LOC_ID</String>
+          <String>ShipToDeliveryLocationID</String>
+          <String>CustomerShipToAddressID</String>
+          <String>Orginal Invoice</String>
+          <String>Inventory Org</String>
+          <String>Order Number</String>
+          <String>Address Number</String>
+          <String>Invoice Number</String>
+          <String>Doc Type</String>
+          <String>U/M</String>
+          <String>Ship Date</String>
+          <String>Invoice Date</String>
+          <String>Promised Delivery Date</String>
+          <String>Date</String>
+          <String>MonthStoreFlag</String>
+          <String>SALES_QUANTITY</String>
+          <String>Sales Qty</String>
+          <String>GROSS_SALES_AMOUNT_LC</String>
+          <String>GROSS Sales Amount LC</String>
+          <String>RETURNS_LC</String>
+          <String>Returns LC</String>
+          <String>SALES_COST_AMOUNT_LC</String>
+          <String>Sales Cost Amount LC (net see thru)</String>
+          <String>GROSS_SALES_AMOUNT_DOC</String>
+          <String>Trxn Sales Amount</String>
+          <String>SALES_COST_AMOUNT_DOC</String>
+          <String>Trxn COGS Amount</String>
+          <String>SALES_COST_AMOUNT_LE_DOC</String>
+          <String>BASE_COGS</String>
+          <String>SALES_COST_AMOUNT_LE</String>
+          <String>COST_LE</String>
+          <String>PO Number</String>
+          <String>Settlement Discount LC</String>
+          <String>Trans Type</String>
+          <String>Co-op Rebate LC</String>
+          <String>Rebates LC</String>
+          <String>Volume Discount LC</String>
+          <String>BOGO</String>
+          <String>Slotting</String>
+          <String>TPR</String>
+          <String>Other</String>
+          <String>COGS Adj 1 LC</String>
+          <String>COGS Adj 2 LC</String>
+          <String>Type of Discount #</String>
+          <String>Type of Discount Name</String>
+          <String>Offer #</String>
+          <String>Source Name</String>
+          <String>Flag</String>
+          <String>SHIPTO_DEL_LOC_ID</String>
+          <String>CO_OP_REBATE_LC</String>
+          <String>REBATES_LC</String>
+          <String>VOLUME_DISCOUNT_LC</String>
+          <String>BOGO.src</String>
+          <String>SLOTTING</String>
+          <String>TPR.src</String>
+          <String>OFFER</String>
+          <String>ShipToDeliveryLocationID.src</String>
+          <String>Sales Quantity</String>
+          <String>GROSS Sales Amount   LC</String>
+          <String>Returns LC.src</String>
+          <String>Sales Cost Amount LC (net see thru).src</String>
+          <String>Settlement Discount LC.src</String>
+          <String>Co-op Rebate LC.src</String>
+          <String>Rebates LC.src</String>
+          <String>Volume Discount LC.src</String>
+          <String>Slotting.src</String>
+          <String>Other.src</String>
+          <String>Offer #.src</String>
+          <String>Sales Cost Amount Legal Entity.src</String>
+          <String>Module</String>
+          <String>STATUS</String>
+          <String>LOG.RN</String>
+          <String>ReloadTime</String>
+          <String>TABLE</String>
+          <String>MESSAGE</String>
+          <String>REC_NO</String>
+          <String>FromValue</String>
+          <String>ToValue</String>
+          <String>FILENAME</String>
+          <String>File name</String>
+          <String>$Field</String>
+          <String>$Table</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$date</Tag>
+        <FieldNames>
+          <String>Invoice Date</String>
+          <String>Promised Delivery Date</String>
+          <String>Date</String>
+          <String>Ship Date</String>
+          <String>Invoice Number</String>
+        </FieldNames>
+      </FieldTagData>
+    </ScriptBased>
+    <Interactive>
+      <FieldTagData>
+        <Tag>$numeric</Tag>
+        <FieldNames>
+          <String>ReloadTime</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$timestamp</Tag>
+        <FieldNames>
+          <String>ReloadTime</String>
+        </FieldNames>
+      </FieldTagData>
+    </Interactive>
+  </FieldTags>
+  <FieldComments></FieldComments>
+  <TableComments></TableComments>
+  <CreatePrjFolder>false</CreatePrjFolder>
+  <LinkedTables></LinkedTables>
+  <AppObjectEntries></AppObjectEntries>
+  <GenericDimensions></GenericDimensions>
+  <GenericMeasures></GenericMeasures>
+  <GenericBookmarks></GenericBookmarks>
+  <ConnectionInfo></ConnectionInfo>
+  <GenericDerivedDefinitions></GenericDerivedDefinitions>
+  <GenericDerivedFields></GenericDerivedFields>
+  <BnfOff>false</BnfOff>
+  <CreatedAfterSingleQuoteExactSearch>false</CreatedAfterSingleQuoteExactSearch>
+</DocInternals>

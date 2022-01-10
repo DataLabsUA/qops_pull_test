@@ -1,0 +1,1084 @@
+﻿///$tab License
+/*************************************************************************
+* 
+* Ansell Healthcare, LLC
+* DVSTS Ltd.
+* CONFIDENTIAL
+* __________________
+* 
+* 2016 Ansell Healthcare, LLC 
+* 2016 DVSTS Ltd. 
+* All Rights Reserved.
+* 
+* NOTICE:  All information contained herein is, and remains
+* the property of Ansell Healthcare, LLC and DVSTS Ltd. The
+* intellectual and technical concepts contained herein are
+* proprietary to Ansell Healthcare, LLC and DVSTS Ltd. and
+* may be covered by U.S. and Foreign Patents, patents in
+* process, and are protected by trade secret or copyright
+* law. Dissemination of this information or reproduction of
+* this material is strictly forbidden unless prior written
+* permission is obtained from Ansell Healthcare, LLC.
+*************************************************************************/
+ 
+///$tab Main
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='₹ #,##0.00;₹ -#,##0.00';
+SET TimeFormat='hh:mm:ss';
+SET DateFormat='MM/DD/YYYY';
+SET TimestampFormat='MM/DD/YYYY hh:mm:ss[.fff]';
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+
+LET vReloadTime = Num(Now(),'##############');
+LET vCheckResult = False();
+
+$(Include=.\Sales_EMEAMADsettings.qvs);
+
+LET vSrcPath = if(Right(vSrcPath,1) = '\',vSrcPath,vSrcPath&'\');
+LET vQVDPath = if(Right(vQVDPath,1) = '\',vQVDPath,vQVDPath&'\');
+
+$(Include=$(vINCPath)procedures.qvs);
+$(Include=$(vINCPath)\transformmailprocedures.qvs);
+
+SET vPurgeChars = Chr(9)&Chr(10)&Chr(13)&Chr(32)&Chr(160)&Chr(12288)&'-';
+SET vRegionList = 'NA','EMEA', 'APAC' ,'Central','LAC','Microgard';
+
+IF vReloadAll then
+
+	EXECUTE powershell -Command "& {remove-item '$(vQVDPath)Sales_EMEAMAD-*.qvd' -Force}";
+
+	LET vReloadAll = False();
+
+ENDIF
+
+CALL FindStartDate('Sales_EMEAMAD', 'pStartDate');
+LET pStartDate = RangeMin(pStartDate,alt(vIncStartDate+1,MonthStart(Today(0)-45,-1)));
+///$tab v05Update
+if Alt(v05Update,0)=1 THEN
+
+	FOR Each vFile in FileList(vQVDPath&'Sales_EMEAMAD-*.qvd')
+		
+		LET vYear = num(num#(keepchar(SubField(replace(vFile,'/','\'),'\',alt(SubStringCount(replace(vFile,'/','\'),'\'),0)+1),'0123456789')));
+		
+		IF vYear = 2015 THEN
+			
+			t:
+			NoConcatenate
+			LOAD *
+			FROM
+			[$(vFile)]
+			(qvd)
+			Where [Date]>=makedate(2015,7,1);
+			
+			STORE t into '$(vFile)' (qvd);
+			
+			DROP Table t;
+		
+		ELSEIF vYear < 2015 THEN
+			
+			t:
+			NoConcatenate LOAD
+				Null() as [FN]
+				,Null() as [RN]
+				,Null() as [Trxn Currency]
+				,Null() as [COGS Trxn Currency]
+				,Null() as [FinalCurrency]
+				,Null() as [COGS_FinalCurrency]
+				,Null() as [LocalCurrency]
+				,Null() as [Currency]
+				,Null() as [CompoundKey]
+				,Null() as [Entity]
+				,Null() as [Customer Number]
+				,Null() as [Product Number]
+				,Null() as [ShipToDeliveryLocationID]
+				,Null() as [CustomerShipToAddressID]
+				,Null() as [Orginal Invoice]
+				,Null() as [Inventory Org]
+				,Null() as [Order Number]
+				,Null() as [Address Number]
+				,Null() as [Invoice Number]
+				,Null() as [Doc Type]
+				,Null() as [U/M]
+				,Null() as [Ship Date]
+				,Null() as [Invoice Date]
+				,Null() as [Promised Delivery Date]
+				,Null() as [Date]
+				,Null() as [Sales Qty]
+				,Null() as [GROSS Sales Amount LC]
+				,Null() as [Returns LC]
+				,Null() as [Sales Cost Amount LC (net see thru)]
+				,Null() as [Trxn Sales Amount]
+				,Null() as [Trxn COGS Amount]
+				,Null() as [BASE_COGS]
+				,Null() as [COST_LE]
+				,Null() as [Settlement Discount LC]
+				,Null() as [Trans Type]
+				,Null() as [Co-op Rebate LC]
+				,Null() as [Rebates LC]
+				,Null() as [Volume Discount LC]
+				,Null() as [BOGO]
+				,Null() as [Slotting]
+				,Null() as [TPR]
+				,Null() as [Other]
+				,Null() as [COGS Adj 1 LC]
+				,Null() as [COGS Adj 2 LC]
+				,Null() as [Type of Discount #]
+				,Null() as [Type of Discount Name]
+				,Null() as [Offer #]
+				,Null() as [Flag]
+				,Null() as [Region]
+				,Null() as [SubRegion]
+				,Null() as [PO Number]
+			AutoGenerate(0);
+
+			STORE t into '$(vFile)' (qvd);
+			
+			DROP Table t;
+		
+		ENDIF;
+		
+		LET vYear = Null();
+	
+	NEXT vFile;
+	
+	LET vFile = Null();
+	LET v05Update = 0;
+
+ENDIF
+///$tab Transaction
+SET pFileCheck = if(Upper('$1') like Upper('Sales TM upload EMEA SUI 201811 - CB reversal.xlsx'),0,pML_StartDate);
+SET pFCError = 'Exclude this file CR 334';
+
+SET pTable = Sales_EMEAMAD_Transaction;
+SET pMask = ESR Operation Files\Uploads\ManualAdjustments_GIS2\SALES*.XLSX;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		,If(if(
+			Alt(Len(Purgechar([Trxn Currency],$(vPurgeChars))),0)=0
+			,[Currency]
+			,[Trxn Currency]
+			)  <> if(
+			Alt(Len(Purgechar([COGS Trxn Currency],$(vPurgeChars))),0)=0
+			,[Currency]
+			,[COGS Trxn Currency]
+			) ,SubField('2_3','_'),1)		
+													as FlagCheckCurrency
+		
+		,if(
+			Alt(Len(Purgechar([Trxn Currency],$(vPurgeChars))),0)=0
+			,[Currency]
+			,[Trxn Currency]
+			) 		as [Trxn Currency]
+		,if(
+			Alt(Len(Purgechar([COGS Trxn Currency],$(vPurgeChars))),0)=0
+			,[Currency]
+			,[COGS Trxn Currency]
+			) 	as [COGS Trxn Currency]
+		
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,if(if(
+				Alt(Len(Purgechar([Trxn Currency],$(vPurgeChars))),0)=0
+				,[Currency]
+				,[Trxn Currency]
+				) <> if(
+					Alt(Len(Purgechar([COGS Trxn Currency],$(vPurgeChars))),0)=0
+					,[Currency]
+					,[COGS Trxn Currency]
+					)
+				,if(
+					Alt(Len(Purgechar([Trxn Currency],$(vPurgeChars))),0)=0
+					,[Currency]
+					,[Trxn Currency]
+					)
+				,if(
+					Alt(Len(Purgechar([COGS Trxn Currency],$(vPurgeChars))),0)=0
+					,[Currency]
+					,[COGS Trxn Currency]
+					))
+			,if(
+				Alt(Len(Purgechar([COGS Trxn Currency],$(vPurgeChars))),0)=0
+				,[Currency]
+				,[COGS Trxn Currency]
+				)) 		as [FinalCurrency]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,if(
+				Alt(Len(Purgechar([Trxn Currency],$(vPurgeChars))),0)=0
+				,[Currency]
+				,[Trxn Currency]
+				)
+			,if(
+				Alt(Len(Purgechar([COGS Trxn Currency],$(vPurgeChars))),0)=0
+				,[Currency]
+				,[COGS Trxn Currency]
+				)) 		as [COGS_FinalCurrency]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,[Currency]
+			,if(
+				Alt(Len(Purgechar([COGS Trxn Currency],$(vPurgeChars))),0)=0
+				,[Currency]
+				,[COGS Trxn Currency]
+				)) as [LocalCurrency]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,[Currency]
+			,if(
+				Alt(Len(Purgechar([COGS Trxn Currency],$(vPurgeChars))),0)=0
+				,[Currency]
+				,[COGS Trxn Currency]
+				)) as [Currency]
+		
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,[Currency]
+			,if(
+				Alt(Len(Purgechar([COGS Trxn Currency],$(vPurgeChars))),0)=0
+				,[Currency]
+				,[COGS Trxn Currency]
+				))&'-'&Text(Date([Invoice Date],'YYMM')) as [CompoundKey]
+		
+		,Text([Company Number Detail]) as [Entity]
+		,Text([CustomerID]) as [Customer Number]
+		,Text(trim([Item Number])) as [Product Number]
+		
+		,[ShipToDeliveryLocationID]
+		,if([Invoice Date] >= makedate(2016,3,1) and Match([Company Number Detail] ,'10','20','60','ZCMS')
+			,Trim([ShipToDeliveryLocationID])
+			,Text([CustomerID])&'-'&Trim(ShipToDeliveryLocationID)) as [CustomerShipToAddressID]
+		
+		,[Item Branch Key (inv org #)] as [Orginal Invoice]
+		,[Item Branch Key (inv org #)] as [Inventory Org]
+		
+		,[Order Number]
+		,[Order Line Number] as [Address Number]
+		,[Invoice Number]
+		,[Doc Type]
+		,[Ansell Std U/M] 	as [U/M]
+		
+		,Num([Ship Date]) 		as [Ship Date]
+		,Num([Invoice Date]) 	as [Invoice Date]
+		,Num([Invoice Date]) 	as [Promised Delivery Date]
+		,Num([Invoice Date]) 	as [Date]
+		,Text(Date([Invoice Date],'YYYY')) as [MonthStoreFlag]
+		
+		,[Sales Quantity]
+		,Alt(Num#(if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,[Sales Quantity]
+			,0)),0) as [Sales Qty]
+		
+		,[GROSS Sales Amount   LC]
+		,Alt(Num#(if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,[GROSS Sales Amount   LC]
+			,0)),0) as [GROSS Sales Amount LC]
+
+		,[Returns LC] 				as [Returns LC.src]
+		,Alt(Num#(if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,[Returns LC]
+			,0)),0) 	as [Returns LC]
+
+		,[Sales Cost Amount LC (net see thru)] 				as [Sales Cost Amount LC (net see thru).src]
+		,Alt(Num#(if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,[Sales Cost Amount LC (net see thru)]
+			,0)),0) as [Sales Cost Amount LC (net see thru)]
+		,Alt(Num#(if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,[Sales Cost Amount LC (net see thru)]
+			,0)),0) as [BASE_COGS]
+
+		,[Sales Cost Amount Legal Entity]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,$(eEmptyCheck(Num#([Sales Cost Amount Legal Entity]),Num#([Sales Cost Amount LC (net see thru)])))
+			,0) as [COST_LE]
+
+		,[Settlement Discount LC] 				as [Settlement Discount LC.src]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,Alt(Num#([Settlement Discount LC]),0)
+			,0) 	as [Settlement Discount LC]
+		
+		,[Trxn Sales Amount]				as [Trxn Sales Amount.src]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,Alt(Num#([Trxn Sales Amount]),0)
+			,0)	as [Trxn Sales Amount]
+		
+		,[Trxn COGS Amount]					as [Trxn COGS Amount.src]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,Alt(Num#([Trxn COGS Amount]),0)
+			,0)	as [Trxn COGS Amount]
+
+		,[Trans Type]
+
+		,[Co-op Rebate LC] 				as [Co-op Rebate LC.src]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,Alt(Num#([Co-op Rebate LC]),0)
+			,0) as [Co-op Rebate LC]
+
+		,[Rebates LC] 				as [Rebates LC.src]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,Alt(Num#([Rebates LC]),0)
+			,0) 	as [Rebates LC]
+
+		,[Volume Discount LC] 				as [Volume Discount LC.src]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,Alt(Num#([Volume Discount LC]),0)
+			,0) 	as [Volume Discount LC]
+
+		,[BOGO] 				as [BOGO.src]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,Alt(Num#([BOGO]),0)
+			,0) 	as [BOGO]
+
+		,[Slotting] 				as [Slotting.src]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,Alt(Num#([Slotting]),0)
+			,0) 	as [Slotting]
+
+		,[TPR] 						as [TPR.src]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,Alt(Num#([TPR]),0)
+			,0) 		as [TPR]
+
+		,[Other] 				as [Other.src]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,Alt(Num#([Other]),0)
+			,0) 	as [Other]
+
+		,[COGS Adj 1 LC] 				as [COGS Adj 1 LC.src]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,Alt(Num#([COGS Adj 1 LC]),0)
+			,0) 	as [COGS Adj 1 LC]
+		
+		,[COGS Adj 2 LC]				as [COGS Adj 2 LC.src]
+		,if(match(Alt(Peek('FlagCheckCurrency',-1,'Sales_EMEAMAD_Transaction'),1),1,3)
+			,if(if(
+				Alt(Len(Purgechar([Trxn Currency],$(vPurgeChars))),0)=0
+				,[Currency]
+				,[Trxn Currency]
+				) <> if(
+					Alt(Len(Purgechar([COGS Trxn Currency],$(vPurgeChars))),0)=0
+					,[Currency]
+					,[COGS Trxn Currency]
+					)
+				,0
+				,Alt(Num#([COGS Adj 2 LC]),0))
+			,Alt(Num#([COGS Adj 2 LC]),0)) 	as [COGS Adj 2 LC]
+		
+		,[Type of Discount #]
+		,[Type of Discount Name]
+
+		,[Offer #]
+		,Null() as [PO Number] 
+		
+		,'Sales' 	as [Flag]
+		,NULL()		as [Region]
+		,NULL()		as [SubRegion]
+		;
+SET pFileSpec = ooxml, embedded labels, table is [Sheet1];
+SET pCondition = ([Invoice Date] >= $(pStartDate) or alt(ApplyMap('mHReload',upper(FilePath()),0),0)=1) and [Invoice Date]>=makedate(2015,7,1);
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition, pFileCheck, pStartDate);
+LET pTable 			= Null(); 
+LET pMask 			= Null(); 
+LET pLoad 			= Null(); 
+LET pFileSpec 		= Null();
+LET pCondition 		= Null(); 
+LET pFileCheck 		= Null();
+
+IF not IsNull(TableNumber('Sales_EMEAMAD_Transaction')) then
+
+	Left Join ([Sales_EMEAMAD_Transaction])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC]
+		Resident [Sales_EMEAMAD_Transaction]
+		Where 
+			(not [BOGO.src] 								= [BOGO]) or
+			(not [Co-op Rebate LC.src] 						= [Co-op Rebate LC]) or
+			(not [COGS Adj 1 LC.src] 						= [COGS Adj 1 LC]) or
+			(not [COGS Adj 2 LC.src] 						= [COGS Adj 2 LC]) or
+			(not [COGS Trxn Currency] 						= [COGS_FinalCurrency]) or
+			(not [GROSS Sales Amount LC] 					= [GROSS Sales Amount LC]) or
+			(not [Other.src] 								= [Other]) or
+			(not [Rebates LC.src] 							= [Rebates LC]) or
+			(not [Returns LC.src] 							= [Returns LC]) or
+			(not [Sales Cost Amount LC (net see thru).src] 	= [Sales Cost Amount LC (net see thru)]) or
+			(not [Sales Cost Amount Legal Entity] 			= [COST_LE]) or
+			(not [Sales Quantity] 							= [Sales Qty]) or
+			(not [Settlement Discount LC.src]				= [Settlement Discount LC]) or
+			(not [Slotting.src] 							= [Slotting]) or
+			(not [TPR.src]									= [TPR]) or
+			(not [Trxn COGS Amount.src] 					= [Trxn COGS Amount]) or
+			(not [Trxn Currency] 							= [FinalCurrency]) or
+			(not [Trxn Sales Amount.src] 					= [Trxn Sales Amount]) or
+			(not [Volume Discount LC.src] 					= [Volume Discount LC])
+			;
+
+	IF FieldValueCount('QC') > 0 then
+		SET vWhere = and QC <> 0;
+	
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'BOGO.src'									,'BOGO'									,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'Co-op Rebate LC.src'						,'Co-op Rebate LC'						,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'COGS Adj 1 LC.src'							,'COGS Adj 1 LC'						,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'COGS Adj 2 LC.src'							,'COGS Adj 2 LC'						,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'COGS Trxn Currency'							,'COGS_FinalCurrency'					,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'GROSS Sales Amount LC'						,'GROSS Sales Amount LC'				,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'Other.src'									,'Other'								,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'Rebates LC.src'								,'Rebates LC'							,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'Returns LC.src'								,'Returns LC'							,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'Sales Cost Amount LC (net see thru).src'	,'Sales Cost Amount LC (net see thru)'	,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'Sales Cost Amount Legal Entity'				,'COST_LE'								,vWhere);	
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'Sales Quantity'								,'Sales Qty'							,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'Settlement Discount LC.src'					,'Settlement Discount LC'				,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'TPR.src'									,'TPR'									,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'Slotting.src'								,'Slotting'								,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'Trxn COGS Amount.src'						,'Trxn COGS Amount'						,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'Trxn Currency'								,'FinalCurrency'						,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'Trxn Sales Amount.src'						,'Trxn Sales Amount'					,vWhere);
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage,'Volume Discount LC.src'						,'Volume Discount LC'					,vWhere);	
+		LET vMessage = Null();
+	ENDIF
+
+	/*IF FieldValueCount('QC') > 0 then
+	
+		SET vMessage = 'Line #'&([RN])&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(not ([BOGO.src] = [BOGO]) ,';[BOGO] "'&[BOGO.src]&'". Replaced with "'&[BOGO]&'";','')
+					&if(not ([Co-op Rebate LC.src] = [Co-op Rebate LC]) ,';[Co-op Rebate LC] "'&[Co-op Rebate LC.src]&'". Replaced with "'&[Co-op Rebate LC]&'";','')
+					&if(not ([COGS Adj 1 LC.src] = [COGS Adj 1 LC]) ,';[COGS Adj 1 LC] "'&[COGS Adj 1 LC.src]&'". Replaced with "'&[COGS Adj 1 LC]&'";','')
+					&if(not ([COGS Adj 2 LC.src] = [COGS Adj 2 LC]) ,';[COGS Adj 2 LC] "'&[COGS Adj 2 LC.src]&'". Replaced with "'&[COGS Adj 2 LC]&'";','')
+					&if(not ([COGS Trxn Currency] = [COGS_FinalCurrency]) ,';[COGS Trxn Currency] "'&[COGS Trxn Currency]&'". Replaced with "'&[COGS_FinalCurrency]&'";','')
+					&if(not ([GROSS Sales Amount LC] = [GROSS Sales Amount LC]) ,';[GROSS Sales Amount LC] "'&[GROSS Sales Amount LC]&'". Replaced with "'&[GROSS Sales Amount LC]&'";','')
+					&if(not ([Other.src] = [Other]) ,';[Other] "'&[Other.src]&'". Replaced with "'&[Other]&'";','')
+					&if(not ([Rebates LC.src] = [Rebates LC]) ,';[Rebates LC] "'&[Rebates LC.src]&'". Replaced with "'&[Rebates LC]&'";','')
+					&if(not ([Returns LC.src] = [Returns LC]) ,';[Returns LC] "'&[Returns LC.src]&'". Replaced with "'&[Returns LC]&'";','')
+					&if(not ([Sales Cost Amount LC (net see thru).src] = [Sales Cost Amount LC (net see thru)]) ,';[Sales Cost Amount LC (net see thru)] "'&[Sales Cost Amount LC (net see thru).src]&'". Replaced with "'&[Sales Cost Amount LC (net see thru)]&'";','')
+					&if(not ([Sales Cost Amount Legal Entity] = [COST_LE]) ,';[Sales Cost Amount Legal Entity] "'&[Sales Cost Amount Legal Entity]&'". Replaced with "'&[COST_LE]&'";','')
+					&if(not ([Sales Quantity] = [Sales Qty]) ,';[Sales Quantity] "'&[Sales Quantity]&'". Replaced with "'&[Sales Qty]&'";','')
+					&if(not ([Settlement Discount LC.src] = [Settlement Discount LC]) ,';[Settlement Discount LC] "'&[Settlement Discount LC.src]&'". Replaced with "'&[Settlement Discount LC]&'";','')
+					&if(not ([Slotting.src] = [Slotting]) ,';[Slotting] "'&[Slotting.src]&'". Replaced with "'&[Slotting]&'";','')
+					&if(not ([TPR.src] = [TPR]) ,';[TPR] "'&[TPR.src]&'". Replaced with "'&[TPR]&'";','')
+					&if(not ([Trxn COGS Amount.src] = [Trxn COGS Amount]) ,';[Trxn COGS Amount] "'&[Trxn COGS Amount.src]&'". Replaced with "'&[Trxn COGS Amount]&'";','')
+					&if(not ([Trxn Currency] = [FinalCurrency]) ,';[Trxn Currency] "'&[Trxn Currency]&'". Replaced with "'&[FinalCurrency]&'";','')
+					&if(not ([Trxn Sales Amount.src] = [Trxn Sales Amount]) ,';[Trxn Sales Amount] "'&[Trxn Sales Amount.src]&'". Replaced with "'&[Trxn Sales Amount]&'";','')
+					&if(not ([Volume Discount LC.src] = [Volume Discount LC]) ,';[Volume Discount LC] "'&[Volume Discount LC.src]&'". Replaced with "'&[Volume Discount LC]&'";','')
+
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('Sales_EMEAMAD_Transaction',cWARNING,vMessage);
+		LET vMessage = Null();
+	
+	ENDIF;
+	*/
+	DROP Field [QC] From [Sales_EMEAMAD_Transaction];
+
+	SET pFieldList = [FN]
+			,[RN]
+			,[Trxn Currency]
+			,[COGS Trxn Currency]
+			,[FinalCurrency]
+			,[COGS_FinalCurrency]
+			,[LocalCurrency]
+			,[Currency]
+			,[CompoundKey]
+			,[Entity]
+			,[Customer Number]
+			,[Product Number]
+			,[ShipToDeliveryLocationID]
+			,[CustomerShipToAddressID]
+			,[Orginal Invoice]
+			,[Inventory Org]
+			,[Order Number]
+			,[Address Number]
+			,[Invoice Number]
+			,[Doc Type]
+			,[U/M]
+			,[Ship Date]
+			,[Invoice Date]
+			,[Promised Delivery Date]
+			,[Date]
+			,[Sales Qty]
+			,[GROSS Sales Amount LC]
+			,[Returns LC]
+			,[Sales Cost Amount LC (net see thru)]
+			,[Trxn Sales Amount]
+			,[Trxn COGS Amount]
+			,[BASE_COGS]
+			,[COST_LE]
+			,[Settlement Discount LC]
+			,[Trans Type]
+			,[Co-op Rebate LC]
+			,[Rebates LC]
+			,[Volume Discount LC]
+			,[BOGO]
+			,[Slotting]
+			,[TPR]
+			,[Other]
+			,[COGS Adj 1 LC]
+			,[COGS Adj 2 LC]
+			,[Type of Discount #]
+			,[Type of Discount Name]
+			,[Offer #]
+			,[Flag]
+			,[Region]
+			,[SubRegion]
+			,[PO Number]
+			;
+	SET p_StartDate =  or Num(Date) < $(pStartDate);
+	CALL StoreIncremental('Sales_EMEAMAD_Transaction',pFieldList,'MonthStoreFlag','Sales_EMEAMAD',p_StartDate);
+	LET pFieldList = Null();
+	CALL LogMessage('Sales_EMEAMAD_Transaction',cSUCCESSFUL);
+
+	CALL DropTable('Sales_EMEAMAD_Transaction');
+
+ENDIF;
+///$tab Logs
+
+CALL DelLog ('$(vLOGPath)','$(vLogDocPrefixName)',$(vLogCountSaveLoad))
+
+LET vReloadTime = Timestamp(vReloadTime,'YYYYMMDDhhmmss');
+
+LOG:
+LOAD
+	RecNo() as [LOG.RN]
+	,[Module]
+	,[ReloadTime]
+	,[TABLE]
+	,[STATUS]
+	,IF(STATUS = 'WARNING','Line #'&([REC_NO])&' in field ['&[MESSAGE]&'] data was replaced from value "'&FromValue&'" to value "'&ToValue&'"
+	Source file: "'&FN&'"', MESSAGE)	as MESSAGE
+	,REC_NO
+    ,FromValue
+    ,ToValue
+	,if([STATUS] = 'WARNING ON DOUBLES'
+		,'DOUBLES'
+		,TextBetween([MESSAGE],'[',']',1)) as [FILENAME],
+	FN									as [File name]
+FROM
+[$(vLOGPath)$(vLogDocPrefixName)*$(vReloadTime).qvd]
+(qvd)
+//Where Upper([Module]) = Upper(DocumentPath())
+;
+	
+	[Log_Error]:
+	LOAD 	Module,
+			STATUS,
+			//TABLE,
+			COUNT(STATUS) as QtyWorning
+	Resident LOG
+	Where STATUS <> 'FAILURE'
+	Group BY 	Module,
+				STATUS/*,
+				TABLE*/;
+	
+	IF NoOfFields('Log_Error') then	
+		STORE Log_Error into '$(vLOGPath)$(vLogTotalPrefixName)Error_$(vReloadTime).qvd' (qvd);
+		
+		DROP Table Log_Error;
+	ENDIF	
+
+	CALL DelLog ('$(vLOGPath)','$(vLogDocPrefixName)',$(vLogCountSaveLoad))
+	
+		[Log_FAILURE]:
+		NoConcatenate LOAD 	*
+		Resident LOG
+		Where STATUS = 'FAILURE';
+	
+	IF NoOfFields('Log_FAILURE') then	
+		STORE Log_FAILURE into '$(vLOGPath)$(vLogTotalPrefixName)FAILURE_$(vReloadTime).qvd' (qvd);
+		
+		DROP Table Log_FAILURE;
+	ENDIF	
+
+	CALL DelLog ('$(vLOGPath)','$(vLogTotalPrefixName)',$(vLogCountSaveLoad))
+///$tab Mail
+CALL FailuresInTransformMessage('');
+///$tab Check
+if vCheckResult then
+
+	Check:
+	LOAD
+		Null() as [FN]
+	AutoGenerate(0);
+	
+	FOR Each vFile in FileList('$(vQVDPath)Sales_EMEAMAD-*.qvd')
+	
+		IF (Year(Date#(Right(SubField(SubField(Replace(vFile,'\','/'),'/',-1),'.',-2),4),'YYYY')) >= Year(pStartDate)) or (alt(pStartDate,0)=0) then
+		
+			LET vWhere = if(
+				(Year(Date#(Right(SubField(SubField(Replace(vFile,'\','/'),'/',-1),'.',-2),4),'YYYY')) = Year(pStartDate)) 
+				and (MakeDate(Year(Date#(Right(SubField(SubField(Replace(vFile,'\','/'),'/',-1),'.',-2),4),'YYYY')))<MonthStart(pStartDate)) 
+				and not (alt(pStartDate,0)=0)
+				,'Where [Date] >= ' & Num(pStartDate)
+				,'');
+	
+			Concatenate(Check)
+			LOAD
+				*
+			FROM
+			[$(vFile)]
+			(qvd)
+			$(vWhere);
+			
+			LET vWhere = Null();
+			LET vEMEACheck = Null();
+			LET vEMEACheck2 = Null();
+		
+		ENDIF;
+	
+	NEXT vFile;
+	
+	LET vFile = Null();
+
+ENDIF
+///$tab Exit script
+EXIT SCRIPT;
+///$tab COGS
+SET pTable = Sales_EMEA_COGS;
+SET pMask = GIS Operation Files\SAP\BILLING_COGS_*.qvd;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,[TxnCurr] as [Trxn Currency]
+		,[TxnCurr] as [COGS Trxn Currency]
+		,[TxnCurr] as [FinalCurrency]
+		,[TxnCurr] as [COGS_FinalCurrency]
+		,[TxnCurr] as [LocalCurrency]
+		,[TxnCurr] as [Currency]
+		
+//		,[TxnCurr]&'-'&Text(Date([Date],'YYMM')) as [CompoundKey]
+		
+//		,Text([Entity]) as [Entity]
+//		,Text([Customer Number]) as [Customer Number]
+//		,Text([ProductNumber]) as [Product Number]
+		
+//		,[ShipToDeliveryLocation] as [ShipToDeliveryLocationID]
+		
+//		,[CustomerShipToAddressID] as [CustomerShipToAddressID]
+		
+//		,[InventoryOrg] as [Orginal Invoice]
+//		,[InventoryOrg] as [Inventory Org]
+		
+//		,[OrdNumber] as [Order Number]
+//		,[InvLine] as [Address Number]
+//		,[InvNumber] as [Invoice Number]
+//		,[DocType] as [Doc Type]
+//		,[U/M] as [U/M]
+		
+//		,Num([ShipDate]) as [Ship Date]
+//		,Num([InvoiceDate]) as [Invoice Date]
+//		,Num([PromisedDeliveryDate]) as [Promised Delivery Date]
+//		,Num([Date]) as [Date]
+//		,Text(Date([Date],'YYYY')) as [MonthStoreFlag]
+		
+		,0 as [Sales Qty]
+		
+		,if([_fTxnType] like 'Gross',Alt(Num#([TxnAmount]),0),0) as [GROSS Sales Amount LC]
+
+		,if([_fTxnType] like 'Returns',-Alt(Num#([TxnAmount]),0),0) as [Returns LC]
+		,if([_fTxnType] like 'CostFactory',-Alt(Num#([TxnAmount]),0),0) as [Sales Cost Amount LC (net see thru)]
+		,0 as [Trxn Sales Amount]
+		,0 as [Trxn COGS Amount]
+		,if([_fTxnType] like 'CostFactory',-Alt(Num#([TxnAmount]),0),0) as [BASE_COGS]
+		,0 as [COST_LE]
+		,0 as [Settlement Discount LC]
+
+		,[TxnType] as [Trans Type]
+
+		,0 as [Co-op Rebate LC]
+		
+		,if([_fTxnType] like 'Rebate',-Alt(Num#([TxnAmount]),0),0) as [Rebates LC]
+		
+		,0 as [Volume Discount LC]
+		,0 as [BOGO]
+		,0 as [Slotting]
+		,0 as [TPR]
+		,0 as [Other]
+		
+		,if([_fTxnType] like 'CostTransport',-Alt(Num#([TxnAmount]),0),0) as [COGS Adj 1 LC]
+		
+		,0 as [COGS Adj 2 LC]
+		,0 as [Type of Discount #]
+		,0 as [Type of Discount Name]
+
+		,0 as [Offer #]
+		
+		,'Sales' as [Flag]
+		
+//		,[Region]
+//		,[SubRegion]
+		,[_kSales]
+		;
+SET pFileSpec = qvd;
+LET pCondition = Null();
+SET pFileCheck = Pick(
+	WildMatch(Upper('$1'),'COGS_SAP_??????.QVD')+1
+	,0
+	,Date(MonthStart(Date#(Right(SubField('$1','.',1),6),'YYYYMM')),'YYYYMMDD')&'-'&Date(MonthEnd(Date#(Right(SubField('$1','.',1),6),'YYYYMM')),'YYYYMMDD')
+	);
+SET pFCError = 'Expected to have "COGS_SAP_[YYYYMM].QVD"';
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition, pFileCheck, pStartDate, pFCError);
+
+SET pMask = GIS Operation Files\APSMG\BILLING_COGS_*.qvd;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition, pFileCheck, pStartDate, pFCError);
+
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+LET pCondition 	= Null();
+LET pFileCheck 	= Null();
+
+Left Join ([Sales_EMEA_COGS])
+	LOAD Distinct
+		[_kSales]
+		,[Entity]
+		,[Customer Number]
+		,[Product Number]
+		
+		,[ShipToDeliveryLocationID]
+		
+		,[CustomerShipToAddressID]
+		
+		,[Orginal Invoice]
+		,[Inventory Org]
+		
+		,[Order Number]
+		,[Address Number]
+		,[Invoice Number]
+		,[Doc Type]
+		,[U/M]
+		
+		,[Ship Date]
+		,[Invoice Date]
+		,[Promised Delivery Date]
+		,[Date]
+		,[MonthStoreFlag]
+		,[Region]
+		,[SubRegion]
+	Resident [Sales_EMEA_Billing];
+
+CALL DropTable('Sales_EMEA_Billing');
+
+Left Join ([Sales_EMEA_COGS])
+	LOAD Distinct
+		[RN]
+		,[FN]
+		,[Trxn Currency]&'-'&Text(Date([Date],'YYMM')) as [CompoundKey]
+	Resident [Sales_EMEA_COGS];
+	
+IF not IsNull(TableNumber('Sales_EMEA_COGS')) then
+
+//	Left Join ([Sales_EMEA_COGS])
+//		LOAD Distinct
+//			[RN]
+//			,[FN]
+//			,1 as [QC]
+//		Resident [Sales_EMEA_COGS]
+//		Where 
+//			(not [Trxn Currency] = [FinalCurrency])
+//			or (not [SHIPTO_DLY_LOC_ID] = [ShipToDeliveryLocationID])
+//			or (not [SALES_QUANTITY] = [Sales Qty])
+//			or (not [GROSS_SALES_AMOUNT_LC] = [GROSS Sales Amount LC])
+//			or (not [RETURNS_LC] = [Returns LC])
+//			or (not [SALES_COST_AMOUNT_LC] = [Sales Cost Amount LC (net see thru)])
+//			or (not [GROSS_SALES_AMOUNT_DOC] = [Trxn Sales Amount])
+//			or (not [SALES_COST_AMOUNT_DOC] = [Trxn COGS Amount])
+//			or (not [SALES_COST_AMOUNT_LE_DOC] = [BASE_COGS])
+//			or (not [SALES_COST_AMOUNT_LE] = [COST_LE])
+//			;
+//
+//	IF FieldValueCount('QC') > 0 then
+//	
+//		SET vMessage = 'Line #'&([RN])&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+//			&replace(
+//				replace(
+//					';;'
+//					&if(not ([Trxn Currency] 			= [FinalCurrency])							,';[TxnCurr] "'&[Trxn Currency]&'". Replaced with "'&[FinalCurrency]&'";','')
+//					&if(not ([SHIPTO_DLY_LOC_ID] 		= [ShipToDeliveryLocationID])				,';[SHIPTO_DLY_LOC_ID] "'&[SHIPTO_DLY_LOC_ID]&'". Replaced with "'&[ShipToDeliveryLocationID]&'";','')
+//					&if(not ([SALES_QUANTITY] 			= [Sales Qty])								,';[SALES_QUANTITY] "'&[SALES_QUANTITY]&'". Replaced with "'&[Sales Qty]&'";','')
+//					&if(not ([GROSS_SALES_AMOUNT_LC] 	= [GROSS Sales Amount LC])					,';[GROSS_SALES_AMOUNT_LC] "'&[GROSS_SALES_AMOUNT_LC]&'". Replaced with "'&[GROSS Sales Amount LC]&'";','')
+//					&if(not ([RETURNS_LC] 				= [Returns LC])								,';[RETURNS_LC] "'&[RETURNS_LC]&'". Replaced with "'&[Returns LC]&'";','')
+//					&if(not ([SALES_COST_AMOUNT_LC] 	= [Sales Cost Amount LC (net see thru)])	,';[SALES_COST_AMOUNT_LC] "'&[SALES_COST_AMOUNT_LC]&'". Replaced with "'&[Sales Cost Amount LC (net see thru)]&'";','')
+//					&if(not ([GROSS_SALES_AMOUNT_DOC] 	= [Trxn Sales Amount])						,';[GROSS_SALES_AMOUNT_DOC] "'&[GROSS_SALES_AMOUNT_DOC]&'". Replaced with "'&[Trxn Sales Amount]&'";','')
+//					&if(not ([SALES_COST_AMOUNT_DOC] 	= [Trxn COGS Amount])						,';[SALES_COST_AMOUNT_DOC] "'&[SALES_COST_AMOUNT_DOC]&'". Replaced with "'&[Trxn COGS Amount]&'";','')
+//					&if(not ([SALES_COST_AMOUNT_LE_DOC]	= [BASE_COGS])								,';[SALES_COST_AMOUNT_LE_DOC] "'&[SALES_COST_AMOUNT_LE_DOC]&'". Replaced with "'&[BASE_COGS]&'";','')
+//					&if(not ([SALES_COST_AMOUNT_LE]		= [COST_LE])								,';[SALES_COST_AMOUNT_LE] "'&[SALES_COST_AMOUNT_LE]&'". Replaced with "'&[COST_LE]&'";','')
+//					&';;'
+//					,';;;'
+//					,'')
+//				,';;'
+//				,chr(10)&chr(13))
+//			;
+//		CALL LogMessage('Sales_EMEA_COGS',cWARNING,vMessage);
+//		LET vMessage = Null();
+//	
+//	ENDIF;
+//	
+//	DROP Field [QC] From [Sales_EMEA_COGS];
+
+	SET pFieldList = [FN]
+			,[RN]
+			,[Trxn Currency]
+			,[COGS Trxn Currency]
+			,[FinalCurrency]
+			,[COGS_FinalCurrency]
+			,[LocalCurrency]
+			,[Currency]
+			,[CompoundKey]
+			,[Entity]
+			,[Customer Number]
+			,[Product Number]
+			,[ShipToDeliveryLocationID]
+			,[CustomerShipToAddressID]
+			,[Orginal Invoice]
+			,[Inventory Org]
+			,[Order Number]
+			,[Address Number]
+			,[Invoice Number]
+			,[Doc Type]
+			,[U/M]
+			,[Ship Date]
+			,[Invoice Date]
+			,[Promised Delivery Date]
+			,[Date]
+			,[Sales Qty]
+			,[GROSS Sales Amount LC]
+			,[Returns LC]
+			,[Sales Cost Amount LC (net see thru)]
+			,[Trxn Sales Amount]
+			,[Trxn COGS Amount]
+			,[BASE_COGS]
+			,[COST_LE]
+			,[Settlement Discount LC]
+			,[Trans Type]
+			,[Co-op Rebate LC]
+			,[Rebates LC]
+			,[Volume Discount LC]
+			,[BOGO]
+			,[Slotting]
+			,[TPR]
+			,[Other]
+			,[COGS Adj 1 LC]
+			,[COGS Adj 2 LC]
+			,[Type of Discount #]
+			,[Type of Discount Name]
+			,[Offer #]
+			,[Flag]
+			,[Region]
+			,[SubRegion]
+			;
+	SET p_StartDate =  or Num(Date) < $(pStartDate);
+	CALL StoreIncremental('Sales_EMEA_COGS',pFieldList,'MonthStoreFlag','Sales_EMEA',p_StartDate);
+	LET pFieldList = Null();
+	CALL LogMessage('Sales_EMEA_COGS',cSUCCESSFUL);
+
+	CALL DropTable('Sales_EMEA_COGS');
+
+ENDIF;
+///$tab Billing
+SET pTable = Sales_EMEA_Billing;
+SET pMask = GIS Operation Files\SAP\Billing_SAP_*.qvd;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,[TxnCurr] as [Trxn Currency]
+		,[TxnCurr] as [COGS Trxn Currency]
+		,[TxnCurr] as [FinalCurrency]
+		,[TxnCurr] as [COGS_FinalCurrency]
+		,[TxnCurr] as [LocalCurrency]
+		,[TxnCurr] as [Currency]
+		
+		,[TxnCurr]&'-'&Text(Date([Date],'YYMM')) as [CompoundKey]
+		
+		,Text([Entity]) 			as [Entity]
+		,Text([Customer Number]) 	as [Customer Number]
+		,Text([ProductNumber]) 		as [Product Number]
+		
+		,[ShipToDeliveryLocation] 	as [ShipToDeliveryLocationID]
+		
+		,[CustomerShipToAddressID] 	as [CustomerShipToAddressID]
+		
+		,[InventoryOrg] as [Orginal Invoice]
+		,[InventoryOrg] as [Inventory Org]
+		
+		,[OrdNumber] 	as [Order Number]
+		,[InvLine] 		as [Address Number]
+		,[InvNumber] 	as [Invoice Number]
+		,[DocType] 		as [Doc Type]
+		,[U/M] 			as [U/M]
+		
+		,Num([ShipDate]) 				as [Ship Date]
+		,Num([InvoiceDate]) 			as [Invoice Date]
+		,Num([PromisedDeliveryDate]) 	as [Promised Delivery Date]
+		,Num([Date]) 					as [Date]
+		,Text(Date([Date],'YYYY')) 		as [MonthStoreFlag]
+		
+		,[Qty]
+		,Alt(Num#([Qty]),0) as [Sales Qty]
+		
+		,if([_fTxnType] like 'Gross',Alt(Num#([TxnAmount]),0),0) 	as [GROSS Sales Amount LC]
+
+		,if([_fTxnType] like 'Returns',-Alt(Num#([TxnAmount]),0),0) 	as [Returns LC]
+		,0 as [Sales Cost Amount LC (net see thru)]
+		,0 as [Trxn Sales Amount]
+		,0 as [Trxn COGS Amount]
+		,0 as [BASE_COGS]
+		,0 as [COST_LE]
+		,0 as [Settlement Discount LC]
+
+		,[TxnType] as [Trans Type]
+
+		,0 as [Co-op Rebate LC]
+		
+		,if([_fTxnType] like 'Rebate',-Alt(Num#([TxnAmount]),0),0) as [Rebates LC]
+		
+		,0 as [Volume Discount LC]
+		,0 as [BOGO]
+		,0 as [Slotting]
+		,0 as [TPR]
+		,0 as [Other]
+		
+		,if([_fTxnType] like 'CostTransport',-Alt(Num#([TxnAmount]),0),0) as [COGS Adj 1 LC]
+		
+		,0 as [COGS Adj 2 LC]
+		,0 as [Type of Discount #]
+		,0 as [Type of Discount Name]
+
+		,0 as [Offer #]
+		
+		,'Sales' as [Flag]
+		
+		,[Region]
+		,[SubRegion]
+		,[_kSales]
+		;
+SET pFileSpec = qvd;
+LET pCondition = Null();
+SET pFileCheck = Pick(
+	WildMatch(Upper('$1'),'BILLING_SAP_??????.QVD')+1
+	,0
+	,Date(MonthStart(Date#(Right(SubField('$1','.',1),6),'YYYYMM')),'YYYYMMDD')&'-'&Date(MonthEnd(Date#(Right(SubField('$1','.',1),6),'YYYYMM')),'YYYYMMDD')
+	);
+SET pFCError = 'Expected to have "BILLING_SAP_[YYYYMM].QVD"';
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition, pFileCheck, pStartDate, pFCError);
+
+SET pMask = GIS Operation Files\APSMG\Billing_SAP_*.qvd;
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition, pFileCheck, pStartDate, pFCError);
+
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+LET pCondition 	= Null(); 
+LET pFileCheck 	= Null();
+
+IF not IsNull(TableNumber('Sales_EMEA_Billing')) then
+
+	Left Join ([Sales_EMEA_Billing])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC]
+		Resident [Sales_EMEA_Billing]
+		Where 
+			(not [Qty] = [Sales Qty])
+
+			;
+			
+	IF FieldValueCount('QC') > 0 then
+		
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('Sales_EMEA_Billing',cWARNING,vMessage,'Qty'	,'Sales Qty'	,vWhere);
+		
+	ENDIF
+	
+	/*
+	IF FieldValueCount('QC') > 0 then
+	
+		SET vMessage = 'Line #'&([RN])&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(not ([Qty] = [Sales Qty]) ,';[Qty] "'&[Qty]&'". Replaced with "'&[Sales Qty]&'";','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('Sales_EMEA_Billing',cWARNING,vMessage);
+		LET vMessage = Null();
+	
+	ENDIF;
+	*/
+	DROP Field [QC] From [Sales_EMEA_Billing];
+
+	SET pFieldList = [FN]
+			,[RN]
+			,[Trxn Currency]
+			,[COGS Trxn Currency]
+			,[FinalCurrency]
+			,[COGS_FinalCurrency]
+			,[LocalCurrency]
+			,[Currency]
+			,[CompoundKey]
+			,[Entity]
+			,[Customer Number]
+			,[Product Number]
+			,[ShipToDeliveryLocationID]
+			,[CustomerShipToAddressID]
+			,[Orginal Invoice]
+			,[Inventory Org]
+			,[Order Number]
+			,[Address Number]
+			,[Invoice Number]
+			,[Doc Type]
+			,[U/M]
+			,[Ship Date]
+			,[Invoice Date]
+			,[Promised Delivery Date]
+			,[Date]
+			,[Sales Qty]
+			,[GROSS Sales Amount LC]
+			,[Returns LC]
+			,[Sales Cost Amount LC (net see thru)]
+			,[Trxn Sales Amount]
+			,[Trxn COGS Amount]
+			,[BASE_COGS]
+			,[COST_LE]
+			,[Settlement Discount LC]
+			,[Trans Type]
+			,[Co-op Rebate LC]
+			,[Rebates LC]
+			,[Volume Discount LC]
+			,[BOGO]
+			,[Slotting]
+			,[TPR]
+			,[Other]
+			,[COGS Adj 1 LC]
+			,[COGS Adj 2 LC]
+			,[Type of Discount #]
+			,[Type of Discount Name]
+			,[Offer #]
+			,[Flag]
+			,[Region]
+			,[SubRegion]
+			;
+	SET p_StartDate =  or Num(Date) < $(pStartDate);
+	CALL StoreIncremental('Sales_EMEA_Billing',pFieldList,'MonthStoreFlag','Sales_EMEA',p_StartDate);
+	LET pFieldList = Null();
+	CALL LogMessage('Sales_EMEA_Billing',cSUCCESSFUL);
+
+//	CALL DropTable('Sales_EMEA_Billing');
+
+ENDIF;
+

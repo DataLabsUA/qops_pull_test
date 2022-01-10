@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vEmailPath</Name>
+    <Content>..\_EMAIL\</Content>
+  </Variable>
+</Variables>

@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vML_Table</Name>
+    <Content>Concatenate([Sales_PRMS2_NitritexMAD])</Content>
+  </Variable>
+</Variables>

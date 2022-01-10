@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>pDL_CheckFolder</Name>
+    <Content>..\LOG\</Content>
+  </Variable>
+</Variables>

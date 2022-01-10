@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vHeader</Name>
+    <Content>[CUSTOMER CODE],[ShipToDeliveryLocationID],[PRODUCT NUMBER],[CURRENCY]</Content>
+  </Variable>
+</Variables>

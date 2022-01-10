@@ -1,0 +1,1600 @@
+﻿///$tab License
+/*************************************************************************
+* 
+* Ansell Healthcare, LLC
+* DVSTS Ltd.
+* CONFIDENTIAL
+* __________________
+* 
+* 2016 Ansell Healthcare, LLC 
+* 2016 DVSTS Ltd. 
+* All Rights Reserved.
+* 
+* NOTICE:  All information contained herein is, and remains
+* the property of Ansell Healthcare, LLC and DVSTS Ltd. The
+* intellectual and technical concepts contained herein are
+* proprietary to Ansell Healthcare, LLC and DVSTS Ltd. and
+* may be covered by U.S. and Foreign Patents, patents in
+* process, and are protected by trade secret or copyright
+* law. Dissemination of this information or reproduction of
+* this material is strictly forbidden unless prior written
+* permission is obtained from Ansell Healthcare, LLC.
+*************************************************************************/
+ 
+///$tab Main
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='₹ #,##0.00;₹ -#,##0.00';
+SET TimeFormat='hh:mm:ss';
+SET DateFormat='MM/DD/YYYY';
+SET TimestampFormat='MM/DD/YYYY hh:mm:ss[.fff]';
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+
+LET vReloadTime = Num(Now(),'##############');
+
+$(Include=.\Sales_APACsettings.qvs);
+
+LET vSrcPath = if(Right(vSrcPath,1) = '\',vSrcPath,vSrcPath&'\');
+LET vQVDPath = if(Right(vQVDPath,1) = '\',vQVDPath,vQVDPath&'\');
+
+$(Include=$(vINCPath)procedures.qvs);
+$(Include=$(vINCPath)\transformmailprocedures.qvs);
+
+SET vPurgeChars = Chr(9)&Chr(10)&Chr(13)&Chr(32)&Chr(160)&Chr(12288)&'-';
+SET vRegionList = 'NA','EMEA', 'APAC' ,'Central','LAC','Microgard';
+
+IF vReloadAll then
+
+	EXECUTE powershell -Command "& {remove-item '$(vQVDPath)Sales_APAC-*.qvd' -Force}";
+
+	LET vReloadAll = False();
+
+ENDIF
+
+CALL FindStartDate('Sales_APAC', 'pStartDate');
+LET pStartDate = RangeMin(pStartDate,alt(vIncStartDate+1,MonthStart(Today(0)-45,-1)));
+///$tab Copy V11 and backups
+	SET vPathGaryBackup = ..\_SRC\Gary_Backup\;
+	LET vQtyReloads = 8;
+	
+	tSubFolder:
+	NoConcatenate
+	Load 
+	  Null() as DirName
+	AutoGenerate 0;
+	
+	For Each vSub in DirList('$(vPathGaryBackup)*') 
+	
+		Concatenate(tSubFolder)
+		Load
+			SubField('$(vSub)','\',-1) as DirName
+		AutoGenerate 1;
+		
+	Next vSub
+	
+	SubNames:
+	NoConcatenate
+	Load
+		 Concat('Move-Item '&chr(39)&'$(vPathGaryBackup)'&Text(DirName)&chr(39)&' '&
+	  						chr(39)&'$(vPathGaryBackup)'&Text(DirName+1)&chr(39)&' -Force;', ' ', -DirName) as StrToRename
+	
+		,Concat(if(DirName+1>=$(vQtyReloads), 'Remove-Item '&chr(39)&'$(vPathGaryBackup)'&Text(DirName+1)&chr(39)&' -Recurse -Force;', ''), ' ', -DirName) as StrToMove
+	
+	Resident tSubFolder;
+	
+	Let vCommStrRename = Peek('StrToRename', 0, 'SubNames');
+	Let vCommStrMove = Peek('StrToMove', 0, 'SubNames');
+	
+	
+	If Not IsNull(vCommStrRename) Or Not IsNull(vCommStrMove) THEN
+		EXECUTE powershell -Command "& {$(vCommStrRename) $(vCommStrMove)}";
+	ENDIF
+	
+	DROP Tables tSubFolder, SubNames;
+	
+	Let vCommStrRename 		= Null();
+	Let vCommStrMove 		= Null();
+	LET vSub 				= NULL();
+	
+	//Create 0 folder
+	LET vCreateFolder = chr(34)&'& {New-Item -Path '&chr(39)&'$(vPathGaryBackup)0'&chr(39)&' -ItemType '&chr(34)&'directory'&chr(34)&'}'&chr(34);
+	EXECUTE powershell -Command $(vCreateFolder);
+	LET vCreateFolder = NULL();
+	
+	//copy Gary's files
+ 	Execute cmd.exe /C "\\ansqlik4\QlikviewAuto\Ansell GIS 2.0\_INCLUDES\Copy_APAC_to_ansqlik4.bat";
+	
+	//backup Gary's file V11
+	LET vCopyFile = chr(34)&'& {Copy-Item -Path '&chr(39)&'..\_SRC\Gary\V12_SalesData.qvd'&chr(39)&' -Destination '&chr(39)&'$(vPathGaryBackup)0\V12_SalesData.qvd'&chr(39)&'}'&chr(34);
+	EXECUTE powershell -Command $(vCopyFile);
+	LET vCopyFile = NULL();
+///$tab Transaction
+SET pTable 	= Sales_APAC_Transaction;
+SET pMask 	= APAC\APAC Transaction\Sales *.xlsx;
+SET pLoad 	= RecNo() 	as [RN]
+		,FilePath() 	as [FN]
+
+		,[Trxn Currency]
+		,if(
+			Alt(Len(Purgechar([Trxn Currency],$(vPurgeChars))),0)=0
+			,[Currency]
+			,[Trxn Currency]
+			) 			as [FinalCurrency]
+		
+		,[COGS Trxn Currency]
+		,[Currency] 	as [COGS_FinalCurrency]
+		,[Currency] 	as [LocalCurrency]
+		,[Currency]		as [Currency]
+		
+		,[Currency]&'-'&Text(Date([Invoice Date],'YYMM')) as [CompoundKey]
+		
+		,Text([Company Number Detail]) 	as [Entity]
+		,Text(Trim([CustomerID])) 		as [Customer Number]
+		,Text(Trim([Item Number])) 		as [Product Number]
+		
+		,Trim([ShipToDeliveryLocationID]) as [ShipToDeliveryLocationID]
+		
+		,Trim([CustomerID]) & '-' & Trim([ShipToDeliveryLocationID]) as [CustomerShipToAddressID]
+		
+		,[Item Branch Key] 		as [Orginal Invoice]
+		,[Item Branch Key] 		as [Inventory Org]
+		,[Order Number]
+		,[Order Line Number] 	as [Address Number]
+		,[Invoice Number]
+		
+		,[Doc Type]
+		,[Ansell Std U/M] 		as [U/M]
+		
+		,Num([Ship Date]) 		as [Ship Date]
+		,Num([Invoice Date]) 	as [Invoice Date]
+		,Num([Invoice Date]) 	as [Promised Delivery Date]
+		,Num([Invoice Date]) 	as [Date]
+		,Text(Date([Invoice Date],'YYYY')) as [MonthStoreFlag]
+		
+		,[Sales Quantity] 				as [Sales Quantity]
+		,Alt(Num#([Sales Quantity]),0) 	as [Sales Qty]
+		
+		,[Gross Sales Amount LC] 				as [Gross Sales Amount LC.src]
+		,Alt(Num#([Gross Sales Amount LC]),0) 	as [GROSS Sales Amount LC]
+
+		,[Returns LC] 				as [Returns LC.src]
+		,Alt(Num#([Returns LC]),0)	as [Returns LC]
+
+		,[Sales Cost Amount LC (net see thru)] 	as [Sales Cost Amount LC (net see thru).src]
+		,Alt(Num#([Sales Cost Amount LC (net see thru)]),0) as [Sales Cost Amount LC (net see thru)]
+		,Alt(Num#([Sales Cost Amount LC (net see thru)]),0) as [BASE_COGS]
+		
+		,[Trxn Sales Amount]				as [Trxn Sales Amount.src]
+		,Alt(Num#([Trxn Sales Amount]),0)	as [Trxn Sales Amount]
+		
+		,[Trxn COGS Amount]					as [Trxn COGS Amount.Src]
+		,Alt(Num#([Trxn COGS Amount]),0)	as [Trxn COGS Amount]
+		
+		,[Sales Cost Amt LE]
+		,if(Alt(Len(Trim([Sales Cost Amt LE])),0)=0,Alt(Num#([Sales Cost Amount LC (net see thru)]),0),Alt(Num#([Sales Cost Amt LE]),0)) as [COST_LE]
+
+		,[Settlement Discount LC] 				as [Settlement Discount LC.src]
+		,Alt(Num#([Settlement Discount LC]),0) 	as [Settlement Discount LC]
+
+		,[Co-op Rebate LC] 						as [Co-op Rebate LC.src]
+		,Alt(Num#([Co-op Rebate LC]),0) 		as [Co-op Rebate LC]
+		
+		,[Rebates LC] 							as [Rebates LC.src]
+		,Alt(Num#([Rebates LC]),0) 				as [Rebates LC]
+		
+		,[Volume Discount LC] 					as [Volume Discount LC.src]
+		,Alt(Num#([Volume Discount LC]),0)		as [Volume Discount LC]
+
+		,[BOGO] 								as [BOGO.src]
+		,Alt(Num#([BOGO]),0) 					as [BOGO]
+
+		,[Slotting] 				as [Slotting.src]
+		,Alt(Num#([Slotting]),0) 	as [Slotting]
+
+		,[TPR] 						as [TPR.src]
+		,Alt(Num#([TPR]),0) 		as [TPR]
+
+		,[Other] 					as [Other.src]
+		,Alt(Num#([Other]),0) 		as [Other]
+
+		,[Trans Type]
+		
+		,[COGS Adj 1 LC]				as [COGS Adj 1 LC.src]
+		,Alt(Num#([COGS Adj 1 LC]),0) 	as [COGS Adj 1 LC]
+		
+		,[COGS Adj 2 LC]				as [COGS Adj 2 LC.src]
+		,Alt(Num#([COGS Adj 2 LC]),0) 	as [COGS Adj 2 LC]
+		
+		,[Type of Discount #]
+		,[Type of Discount Name]
+		
+		,[Offer Nbr]
+		,if(Alt(Len(Trim([Offer Nbr])),0)=0,0,[Offer Nbr]) as [Offer #]
+		
+		,'Sales' as [Flag]
+		;
+SET pFileSpec = ooxml, embedded labels, table is Sheet1;
+SET pCondition = ([Invoice Date]>=$(pStartDate) or alt(ApplyMap('mHReload',upper(FilePath()),0),0)=1);
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition, pFileCheck);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+LET pCondition 	= Null(); 
+LET pFileCheck 	= Null();
+
+IF not IsNull(TableNumber('Sales_APAC_Transaction')) then
+
+	Left Join ([Sales_APAC_Transaction])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC]
+		Resident [Sales_APAC_Transaction]
+		Where 
+			(not [BOGO.src] 								= [BOGO]) or
+			(not [Co-op Rebate LC.src] 						= [Co-op Rebate LC]) or
+			(not [COGS Adj 1 LC.src]						= [COGS Adj 1 LC]) or
+			(not [COGS Adj 2 LC.src] 						= [COGS Adj 2 LC]) or
+			(not [Gross Sales Amount LC.src] 				= [GROSS Sales Amount LC]) or
+			(not [Offer Nbr] 								= [Offer #]) or
+			(not [Other.src] 								= [Other]) or
+			(not [Rebates LC.src] 							= [Rebates LC]) or
+			(not [Returns LC.src] 							= [Returns LC]) or
+			(not [Sales Cost Amount LC (net see thru).src] 	= [Sales Cost Amount LC (net see thru)]) or
+			(not [Sales Cost Amt LE] 						= [COST_LE]) or
+			(not [Sales Quantity] 							= [Sales Qty]) or
+			(not [Settlement Discount LC.src] 				= [Settlement Discount LC]) or
+			(not [Slotting.src] 							= [Slotting]) or
+			(not [TPR.src] 									= [TPR]) or
+			(not [Trxn COGS Amount.Src] 					= [Trxn COGS Amount]) or
+			(not [Trxn Currency] 							= [FinalCurrency]) or
+			(not [Trxn Sales Amount.src] 					= [Trxn Sales Amount]) or
+			(not [Volume Discount LC.src] 					= [Volume Discount LC])
+			;
+
+	IF FieldValueCount('QC') > 0 then
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'BOGO.src'									,'BOGO'									,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Co-op Rebate LC.src'						,'Co-op Rebate LC'						,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'COGS Adj 1 LC.src'							,'COGS Adj 1 LC'						,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'COGS Adj 2 LC.src'							,'COGS Adj 2 LC'						,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Gross Sales Amount LC.src'					,'GROSS Sales Amount LC'				,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Offer Nbr'									,'Offer #'								,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Other.src'									,'Other'								,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Rebates LC.src'								,'Rebates LC'							,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Returns LC.src'								,'Returns LC'							,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Sales Cost Amount LC (net see thru).src'	,'Sales Cost Amount LC (net see thru)'	,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Sales Cost Amt LE'							,'COST_LE'								,vWhere);	
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Sales Quantity'								,'Sales Qty'							,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Settlement Discount LC.src'					,'Settlement Discount LC'				,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'TPR.src'									,'TPR'									,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Slotting.src'								,'Slotting'								,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Trxn COGS Amount.Src'						,'Trxn COGS Amount'						,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Trxn Currency'								,'FinalCurrency'						,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Trxn Sales Amount.src'						,'Trxn Sales Amount'					,vWhere);
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage,'Volume Discount LC.src'						,'Volume Discount LC'					,vWhere);	
+		LET vMessage = Null();
+	ENDIF
+	
+
+
+	
+	/*IF FieldValueCount('QC') > 0 then
+	
+		SET vMessage = 'Line #'&([RN])&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(not ([BOGO.src] = [BOGO]) ,';[BOGO] "'&[BOGO.src]&'". Replaced with "'&[BOGO]&'";','')
+					&if(not ([Co-op Rebate LC.src] = [Co-op Rebate LC]) ,';[Co-op Rebate LC] "'&[Co-op Rebate LC.src]&'". Replaced with "'&[Co-op Rebate LC]&'";','')
+					&if(not ([COGS Adj 1 LC.src] = [COGS Adj 1 LC]) ,';[COGS Adj 1 LC] "'&[COGS Adj 1 LC.src]&'". Replaced with "'&[COGS Adj 1 LC]&'";','')
+					&if(not ([COGS Adj 2 LC.src] = [COGS Adj 2 LC]) ,';[COGS Adj 2 LC] "'&[COGS Adj 2 LC.src]&'". Replaced with "'&[COGS Adj 2 LC]&'";','')
+					&if(not ([Gross Sales Amount LC.src] = [GROSS Sales Amount LC]) ,';[Gross Sales Amount LC] "'&[Gross Sales Amount LC.src]&'". Replaced with "'&[GROSS Sales Amount LC]&'";','')
+					&if(not ([Offer Nbr] = [Offer #]) ,';[Offer Nbr] "'&[Offer Nbr]&'". Replaced with "'&[Offer #]&'";','')
+					&if(not ([Other.src] = [Other]) ,';[Other] "'&[Other.src]&'". Replaced with "'&[Other]&'";','')
+					&if(not ([Rebates LC.src] = [Rebates LC]) ,';[Rebates LC] "'&[Rebates LC.src]&'". Replaced with "'&[Rebates LC]&'";','')
+					&if(not ([Returns LC.src] = [Returns LC]) ,';[Returns LC] "'&[Returns LC.src]&'". Replaced with "'&[Returns LC]&'";','')
+					&if(not ([Sales Cost Amount LC (net see thru).src] = [Sales Cost Amount LC (net see thru)]) ,';[Sales Cost Amount LC (net see thru)] "'&[Sales Cost Amount LC (net see thru).src]&'". Replaced with "'&[Sales Cost Amount LC (net see thru)]&'";','')
+					&if(not ([Sales Cost Amt LE] = [COST_LE]) ,';[Sales Cost Amt LE] "'&[Sales Cost Amt LE]&'". Replaced with "'&[COST_LE]&'";','')
+					&if(not ([Sales Quantity] = [Sales Qty]) ,';[Sales Quantity] "'&[Sales Quantity]&'". Replaced with "'&[Sales Qty]&'";','')
+					&if(not ([Settlement Discount LC.src] = [Settlement Discount LC]) ,';[Settlement Discount LC] "'&[Settlement Discount LC.src]&'". Replaced with "'&[Settlement Discount LC]&'";','')
+					&if(not ([Slotting.src] = [Slotting]) ,';[Slotting] "'&[Slotting.src]&'". Replaced with "'&[Slotting]&'";','')
+					&if(not ([TPR.src] = [TPR]) ,';[TPR] "'&[TPR.src]&'". Replaced with "'&[TPR]&'";','')
+					&if(not ([Trxn COGS Amount.Src] = [Trxn COGS Amount]) ,';[Trxn COGS Amount.Src] "'&[Trxn COGS Amount.Src]&'". Replaced with "'&[Trxn COGS Amount]&'";','')
+					&if(not ([Trxn Currency] = [FinalCurrency]) ,';[Trxn Currency] "'&[Trxn Currency]&'". Replaced with "'&[FinalCurrency]&'";','')
+					&if(not ([Trxn Sales Amount.src] = [Trxn Sales Amount]) ,';[Trxn Sales Amount] "'&[Trxn Sales Amount.src]&'". Replaced with "'&[Trxn Sales Amount]&'";','')
+					&if(not ([Volume Discount LC.src] = [Volume Discount LC]) ,';[Volume Discount LC] "'&[Volume Discount LC.src]&'". Replaced with "'&[Volume Discount LC]&'";','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('Sales_APAC_Transaction',cWARNING,vMessage);
+		LET vMessage = Null();
+	
+	ENDIF;*/
+	
+	DROP Field [QC] From [Sales_APAC_Transaction];
+
+	SET pFieldList = [FN]
+			,[RN]
+			,[Trxn Currency]
+			,[COGS Trxn Currency]
+			,[FinalCurrency]
+			,[COGS_FinalCurrency]
+			,[LocalCurrency]
+			,[Currency]
+			,[CompoundKey]
+			,[Entity]
+			,[Customer Number]
+			,[Product Number]
+			,[ShipToDeliveryLocationID]
+			,[CustomerShipToAddressID]
+			,[Orginal Invoice]
+			,[Inventory Org]
+			,[Order Number]
+			,[Address Number]
+			,[Invoice Number]
+			,[Doc Type]
+			,[U/M]
+			,[Ship Date]
+			,[Invoice Date]
+			,[Promised Delivery Date]
+			,[Date]
+			,[Sales Qty]
+			,[GROSS Sales Amount LC]
+			,[Returns LC]
+			,[Sales Cost Amount LC (net see thru)]
+			,[Trxn Sales Amount]
+			,[Trxn COGS Amount]
+			,[BASE_COGS]
+			,[COST_LE]
+			,[Settlement Discount LC]
+			,[Trans Type]
+			,[Co-op Rebate LC]
+			,[Rebates LC]
+			,[Volume Discount LC]
+			,[BOGO]
+			,[Slotting]
+			,[TPR]
+			,[Other]
+			,[COGS Adj 1 LC]
+			,[COGS Adj 2 LC]
+			,[Type of Discount #]
+			,[Type of Discount Name]
+			,[Offer #]
+			,[Flag]
+			;
+			
+	SET p_StartDate =  or Num(Date) < $(pStartDate);
+	CALL StoreIncremental('Sales_APAC_Transaction',pFieldList,'MonthStoreFlag','Sales_APAC',p_StartDate);
+	LET pFieldList = Null();
+	CALL LogMessage('Sales_APAC_Transaction',cSUCCESSFUL);
+	CALL DropTable('Sales_APAC_Transaction');
+
+ENDIF;
+///$tab Main 10
+if Alt(v07Update,0)=1 THEN
+
+	FOR Each vFile in FileList('$(vQVDPath)Sales_APAC-*.qvd')
+		TRACE >>>>>>>>>>>>>>>>>>>>>>>> $(vFile);
+		
+		[t]:
+		LOAD *
+		FROM
+		[$(vFile)]
+		(qvd)
+		Where ( not FN like  '\\ansqlik4\QlikviewAuto\SalesMargin\APAC\Gary Qlik  Data\APAC Sales Data QVD\APAC_Sales_Derived3.qvd' or
+		 (FN like  '\\ansqlik4\QlikviewAuto\SalesMargin\APAC\Gary Qlik  Data\APAC Sales Data QVD\APAC_Sales_Derived3.qvd' and [Invoice Date]< Num(MakeDate(2018,12,1))))	;
+	
+	
+	Store t into $(vFile) (qvd);
+	drop table t;
+	NEXT vFile;
+
+LET vFile = Null();
+	LET v07Update = 0;
+
+ENDIF
+///$tab Gary Maps
+[mGaryCustNo]:
+Mapping
+LOAD CustomerKey, 
+     [Customer Number]
+//     , 
+//     [Customer Name], 
+//     Customer, 
+//     [Corporate Number], 
+//     [Corporate Name], 
+//     Corporate, 
+//     [Single Customer], 
+//     [Region Code], 
+//     Region1, 
+//     Country1, 
+//     [Inter Company], 
+//     [Marketing Segment], 
+//     [Customer Division], 
+//     State, 
+//     Cust_Group, 
+//     Cust_SubGrp, 
+//     SubRegion
+FROM
+\\ansqlik4\QlikviewAuto\Ansell GIS 2.0\_SRC\Gary\V12_CustomerMaster.qvd
+(qvd);
+
+[mGaryItemNo]:
+Mapping
+LOAD ProductKey, 
+     [Item Number]
+//     , 
+//     [Item Desc], 
+//     Product, 
+//     [Product Group], 
+//     [Product Line], 
+//     [Product Type], 
+//     [Product Division1], 
+//     [Default Origin], 
+//     UOM, 
+//     [UOM Standard], 
+//     Style, 
+//     ASPN, 
+//     [New Product], 
+//     [Launch Date], 
+//     [Launch Year], 
+//     [M4 Category], 
+//     [M4 Description], 
+//     Brand
+FROM
+\\ansqlik4\QlikviewAuto\Ansell GIS 2.0\_SRC\Gary\V12_ItemMaster.qvd
+(qvd);
+
+[mGaryUOM]:
+Mapping
+LOAD ProductKey, 
+//     [Item Number]
+//     , 
+//     [Item Desc], 
+//     Product, 
+//     [Product Group], 
+//     [Product Line], 
+//     [Product Type], 
+//     [Product Division1], 
+//     [Default Origin], 
+//     UOM, 
+     [UOM Standard]
+//     Style, 
+//     ASPN, 
+//     [New Product], 
+//     [Launch Date], 
+//     [Launch Year], 
+//     [M4 Category], 
+//     [M4 Description], 
+//     Brand
+FROM
+\\ansqlik4\QlikviewAuto\Ansell GIS 2.0\_SRC\Gary\V12_ItemMaster.qvd
+(qvd);
+
+///$tab Gary v2
+SET pTable = Sales_APAC_Gary;
+
+LET tSrcPath = vSrcPath;
+LET vSrcPath = '';
+
+SET pMask = \\ansqlik4\QlikviewAuto\Ansell GIS 2.0\_SRC\Gary\V12_SalesData.qvd;
+
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,[Trxn Currency]
+		,[COGS Trxn currency] as [COGS Trxn Currency]
+		,if(
+			Alt(Len(Purgechar([Trxn Currency],$(vPurgeChars))),0)=0 or [Trxn Currency]=0
+			,[DB_CURRENCY]
+			,[Trxn Currency]
+			) as [FinalCurrency]
+		,if(
+			Alt(Len(Purgechar([COGS Trxn currency],$(vPurgeChars))),0)=0 or [COGS Trxn currency]=0
+			,[DB_CURRENCY]
+			,[COGS Trxn currency]
+			) as [COGS_FinalCurrency]
+		,trim([DB_CURRENCY]) as [LocalCurrency]
+		,trim([DB_CURRENCY]) as [Currency]
+		
+		,trim([DB_CURRENCY])&'-'&Text(Date([Invoice Date],'YYMM')) as [CompoundKey]
+		
+		,[Company Number Detail] 	as [Entity]
+		,Trim([Customer ID]) 		as [Customer Number]
+		,Trim([Product Number]) 	as [Product Number]
+		
+		,[ShipToDeliveryLocationID] as [ShipToDeliveryLocationID.src]
+		,if(IsNull([ShipToDeliveryLocationID]),'0001',[ShipToDeliveryLocationID]) as [ShipToDeliveryLocationID]
+		
+		,Trim([Customer ID]) & '-' & if(IsNull([ShipToDeliveryLocationID]),'0001',[ShipToDeliveryLocationID]) as [CustomerShipToAddressID]
+		
+		,[Item Branch Key (ing org#)] as [Orginal Invoice]
+		,[Item Branch Key (ing org#)] as [Inventory Org]
+		
+		,[Order Number] 		as [Order Number]
+		,0 						as [Address Number]
+		,[Invoice Number] 		as [Invoice Number]
+		,[Doc Type] 			as [Doc Type]
+		,[UOM Standard] 		as [U/M]
+		
+		,0 						as [Ship Date]
+		,Num([Invoice Date]) 	as [Invoice Date]
+		,Num([Invoice Date]) 	as [Promised Delivery Date]
+		,Num([Invoice Date]) 	as [Date]
+		,Text(Date([Invoice Date],'YYYY')) as [MonthStoreFlag]
+		
+		,[Sales Quantity]				as [Sales Quantity]
+		,Alt(NUm#([Sales Quantity]),0) 	as [Sales Qty]
+		
+		,[GROSS Sales Amount   LC]
+		,Alt(Num#([GROSS Sales Amount   LC]),0) as [GROSS Sales Amount LC]
+
+		,[Returns]
+		,Alt(Num#([Returns]),0) as [Returns LC]
+
+		,[Sales Cost Amount LC (net see thru)] as [Sales Cost Amount LC (net see thru).src]
+		,Alt(Num#([Sales Cost Amount LC (net see thru)]),0) as [Sales Cost Amount LC (net see thru)]
+		
+		,Alt(Num#([Trxn COGS Amount]),0) as [BASE_COGS]
+
+		,[Cost_Legal_Entity]
+		,Alt(Num#([Cost_Legal_Entity]),0) 	as [COST_LE]
+
+		,0 as [Settlement Discount LC]
+		
+		,[Trxn Sales Amount] 				as [Trxn Sales Amount.src]
+		,Alt(Num#([Trxn Sales Amount]),0) 	as [Trxn Sales Amount]
+		
+		,[Trxn COGS Amount]					as [Trxn COGS Amount.src]
+		,Alt(Num#([Trxn COGS Amount]),0) 	as [Trxn COGS Amount]
+
+		,[Trans Type]
+
+		,0 as [Co-op Rebate LC]
+		
+		,[Rebate_LC]
+		,Alt(Num#([Rebate_LC]),0) as [Rebates LC]
+		
+		,0 as [Volume Discount LC]
+		,0 as [BOGO]
+		,0 as [Slotting]
+		,0 as [TPR]
+		,0 as [Other]
+		
+		,[COGS adj1]				as [COGS Adj 1 LC.src]
+		,Alt(Num#([COGS adj1]),0) 	as [COGS Adj 1 LC]
+		
+		,0 as [COGS Adj 2 LC]
+		,0 as [Type of Discount #]
+		,0 as [Type of Discount Name]
+
+		,[Offer#] as [Offer #]
+		,[PO_NBR] as [PO Number]
+		
+		,'Sales' as [Flag]
+		;
+SET pLoad2 = LOAD 
+     if(Entity='Adj','200',Entity) as [Company Number Detail],
+     Sales_DB,
+     DocumentType as [Doc Type],
+    if(DocumentType='Credit Memo','0',if(DocumentType='Fin Adjust','0', if( DocumentType='Invoice','0',if(DocumentType='Rebate',Sales_DB*-1,Sales_DB)))) as Rebate_LC,  
+    if(DocumentType='Rebate','0',if(DocumentType='Fin Adjust','0',if( DocumentType='Invoice','0',if(DocumentType='Credit Memo',Sales_DB*-1,Sales_DB)))) as Returns,
+     if(DocumentType='Credit Memo','0',if(DocumentType='Rebate','0',if((DocumentType='Fin Adjust' and DocumentType='Invoice'),Sales_DB,Sales_DB))) as [GROSS Sales Amount   LC],
+     [Invoice Number], 
+     [Order Number], 
+     IF(Entity='AS' AND [Address Number]='','0001',IF(Entity='APS_SIN' AND [Address Number]='','0001',IF(Entity='200',RIGHT(ShipToKey,4),[Address Number]))) as ShipToDeliveryLocationID,
+     [Invoice Date],
+     WHS_CODE as [Item Branch Key (ing org#)], 
+     LocalCurrency as [Trxn Currency], 
+     DB_CURRENCY, 
+     OCCURNCY as [COGS Trxn currency],
+      [Sales Qty per Order], 
+      [Sales Qty] AS [Sales Quantity], 
+     ActualSales as [Trxn Sales Amount], 
+     Cost, //
+     ((FACT_COST_RAW)*([Sales Qty per Order]))  as [Trxn COGS Amount], 
+     ((FACT_COST_BUR) * ([Sales Qty per Order])) as [COGS adj1], 
+     CST_DB_DAILY as [Sales Cost Amount LC (net see thru)],
+     RebateKey as [Offer#], 
+     If(Entity='Adj',200,Entity) &'-'& applymap('mGaryCustNo',CustomerKey) as  [Customer ID],  
+     If(Entity='Adj',200,Entity) &'-'& applymap('mGaryItemNo',ProductKey) as [Product Number], 
+     applymap('mGaryUOM',ProductKey) as [UOM Standard], 
+//     SHIPNOX,
+//     COY, 
+     Cost_Legal_Entity,
+//     CUSNO,
+	 [PO_NBR],
+     [Trans Type];
+LET pLoad = pLoad&'
+;
+'&pLoad2;
+SET pFileSpec = qvd;
+SET pCondition = (([Invoice Date]>=$(pStartDate) or alt(ApplyMap('mHReload',upper(FilePath()),0),0)=1) and not WildMatch(Entity,'APS_SWE','250','APS_SIN','Budget','COM','Forecast','MIDAS') and [Invoice Date]>= Num(MakeDate(2018,12,1)));
+
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition, pFileCheck, pStartDate);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+LET pCondition 	= Null(); 
+LET pFileCheck 	= Null();
+
+IF not IsNull(TableNumber('Sales_APAC_Gary')) then
+
+	Left Join ([Sales_APAC_Gary])
+		LOAD Distinct
+			 [RN]
+			,[FN]
+			,1 			as [QC]
+		Resident [Sales_APAC_Gary]
+		Where 
+			(not [COGS Adj 1 LC.src] 						= [COGS Adj 1 LC]) or
+			(not [COGS Trxn Currency] 						= [COGS_FinalCurrency]) or
+			(not [Cost_Legal_Entity] 						= [COST_LE]) or
+			(not [GROSS Sales Amount LC] 					= [GROSS Sales Amount LC]) or
+			(not [Rebate_LC] 								= [Rebates LC]) or
+			(not [Returns] 									= [Returns LC]) or
+			(not [Sales Cost Amount LC (net see thru).src]	= [Sales Cost Amount LC (net see thru)]) or
+			(not [Sales Quantity] 							= [Sales Qty]) or
+			(not [ShipToDeliveryLocationID.src] 			= [ShipToDeliveryLocationID]) or
+			(not [Trxn COGS Amount.src] 					= [Trxn COGS Amount]) or
+			(not [Trxn Currency] 							= [FinalCurrency]) or
+			(not [Trxn Sales Amount.src] 					= [Trxn Sales Amount]);
+
+
+	IF FieldValueCount('QC') > 0 then
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'COGS Adj 1 LC.src'							,'COGS Adj 1 LC'						,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'COGS Trxn Currency'						,'COGS_FinalCurrency'					,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Cost_Legal_Entity'							,'COST_LE'								,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'GROSS Sales Amount LC'						,'GROSS Sales Amount LC'				,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Rebate_LC'									,'Rebates LC'							,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Returns'									,'Returns LC'							,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Sales Cost Amount LC (net see thru).src'	,'Sales Cost Amount LC (net see thru)'	,vWhere);	
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Sales Quantity'							,'Sales Qty'							,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'ShipToDeliveryLocationID.src'				,'ShipToDeliveryLocationID'				,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Trxn COGS Amount.src'						,'Trxn COGS Amount'						,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Trxn Currency'								,'FinalCurrency'						,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Trxn Sales Amount.src'						,'Trxn Sales Amount'					,vWhere);
+		LET vMessage = Null();
+	ENDIF
+
+	
+	
+	/*IF FieldValueCount('QC') > 0 then
+	
+		SET vMessage = 'Line #'&([RN])&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(not ([COGS Adj 1 LC.src] = [COGS Adj 1 LC]) ,';[COGS Adj 1 LC] "'&[COGS Adj 1 LC.src]&'". Replaced with "'&[COGS Adj 1 LC]&'";','')
+					&if(not ([COGS Trxn Currency] = [COGS_FinalCurrency]) ,';[COGS Trxn Currency] "'&[COGS Trxn Currency]&'". Replaced with "'&[COGS_FinalCurrency]&'";','')
+					&if(not ([Cost_Legal_Entity] = [COST_LE]) ,';[Cost_Legal_Entity] "'&[Cost_Legal_Entity]&'". Replaced with "'&[COST_LE]&'";','')
+					&if(not ([GROSS Sales Amount LC] = [GROSS Sales Amount LC]) ,';[GROSS Sales Amount LC] "'&[GROSS Sales Amount LC]&'". Replaced with "'&[GROSS Sales Amount LC]&'";','')
+					&if(not ([Rebate_LC] = [Rebates LC]) ,';[Rebate_LC] "'&[Rebate_LC]&'". Replaced with "'&[Rebates LC]&'";','')
+					&if(not ([Returns] = [Returns LC]) ,';[Returns] "'&[Returns]&'". Replaced with "'&[Returns LC]&'";','')
+					&if(not ([Sales Cost Amount LC (net see thru).src] = [Sales Cost Amount LC (net see thru)]) ,';[Sales Cost Amount LC (net see thru)] "'&[Sales Cost Amount LC (net see thru).src]&'". Replaced with "'&[Sales Cost Amount LC (net see thru)]&'";','')
+					&if(not ([Sales Quantity] = [Sales Qty]) ,';[Sales Quantity] "'&[Sales Quantity]&'". Replaced with "'&[Sales Qty]&'";','')
+					&if(not ([ShipToDeliveryLocationID.src] = [ShipToDeliveryLocationID]) ,';[ShipToDeliveryLocationID] "'&[ShipToDeliveryLocationID.src]&'". Replaced with "'&[ShipToDeliveryLocationID]&'";','')
+					&if(not ([Trxn COGS Amount.src] = [Trxn COGS Amount]) ,';[Trxn COGS Amount] "'&[Trxn COGS Amount.src]&'". Replaced with "'&[Trxn COGS Amount]&'";','')
+					&if(not ([Trxn Currency] = [FinalCurrency]) ,';[Trxn Currency] "'&[Trxn Currency]&'". Replaced with "'&[FinalCurrency]&'";','')
+					&if(not ([Trxn Sales Amount.src] = [Trxn Sales Amount]) ,';[Trxn Sales Amount] "'&[Trxn Sales Amount.src]&'". Replaced with "'&[Trxn Sales Amount]&'";','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage);
+		LET vMessage = Null();
+	
+	ENDIF;
+	*/
+	DROP Field [QC] From [Sales_APAC_Gary];
+
+	SET pFieldList = [FN]
+			,[RN]
+			,[Trxn Currency]
+			,[COGS Trxn Currency]
+			,[FinalCurrency]
+			,[COGS_FinalCurrency]
+			,[LocalCurrency]
+			,[Currency]
+			,[CompoundKey]
+			,[Entity]
+			,[Customer Number]
+			,[Product Number]
+			,[ShipToDeliveryLocationID]
+			,[CustomerShipToAddressID]
+			,[Orginal Invoice]
+			,[Inventory Org]
+			,[Order Number]
+			,[Address Number]
+			,[Invoice Number]
+			,[Doc Type]
+			,[U/M]
+			,[Ship Date]
+			,[Invoice Date]
+			,[Promised Delivery Date]
+			,[Date]
+			,[Sales Qty]
+			,[GROSS Sales Amount LC]
+			,[Returns LC]
+			,[Sales Cost Amount LC (net see thru)]
+			,[Trxn Sales Amount]
+			,[Trxn COGS Amount]
+			,[BASE_COGS]
+			,[COST_LE]
+			,[Settlement Discount LC]
+			,[Trans Type]
+			,[Co-op Rebate LC]
+			,[Rebates LC]
+			,[Volume Discount LC]
+			,[BOGO]
+			,[Slotting]
+			,[TPR]
+			,[Other]
+			,[COGS Adj 1 LC]
+			,[COGS Adj 2 LC]
+			,[Type of Discount #]
+			,[Type of Discount Name]
+			,[Offer #]
+			,[PO Number]
+			,[Flag]
+			;
+			
+	SET p_StartDate =  or Num(Date) < $(pStartDate);
+	CALL StoreIncremental('Sales_APAC_Gary',pFieldList,'MonthStoreFlag','Sales_APAC',p_StartDate);
+	LET pFieldList = Null();
+	CALL LogMessage('Sales_APAC_Gary',cSUCCESSFUL);
+	CALL DropTable('Sales_APAC_Gary');
+
+ENDIF;
+///$tab Gary
+LET vSrcPath = tSrcPath;
+
+SET pTable = Sales_APAC_Gary;
+SET pMask = APAC\Gary Qlik  Data\APAC Sales Data QVD\APAC_Sales_Derived4.qvd;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,[Trxn Currency]
+		,[COGS Trxn currency] as [COGS Trxn Currency]
+		,if(
+			Alt(Len(Purgechar([Trxn Currency],$(vPurgeChars))),0)=0 or [Trxn Currency]=0
+			,[DB_CURRENCY]
+			,[Trxn Currency]
+			) as [FinalCurrency]
+		,if(
+			Alt(Len(Purgechar([COGS Trxn currency],$(vPurgeChars))),0)=0 or [COGS Trxn currency]=0
+			,[DB_CURRENCY]
+			,[COGS Trxn currency]
+			) as [COGS_FinalCurrency]
+		,trim([DB_CURRENCY]) as [LocalCurrency]
+		,trim([DB_CURRENCY]) as [Currency]
+		
+		,trim([DB_CURRENCY])&'-'&Text(Date([Invoice Date],'YYMM')) as [CompoundKey]
+		
+		,[Company Number Detail] 	as [Entity]
+		,Trim([Customer ID]) 		as [Customer Number]
+		,Trim([Product Number]) 	as [Product Number]
+		
+		//,[ShipToDeliveryLocationID] as [ShipToDeliveryLocationID.src]
+		,if([Company Number Detail]='200',Right(ShipToDeliveryLocationID,4),ShipToDeliveryLocationID) as  [ShipToDeliveryLocationID.src]
+		
+		//,if(IsNull([ShipToDeliveryLocationID]),'0001',[ShipToDeliveryLocationID]) as [ShipToDeliveryLocationID]
+		,if(IsNull(if([Company Number Detail]='200',Right(ShipToDeliveryLocationID,4),ShipToDeliveryLocationID)),'0001',if ([Company Number Detail]='200',Right(ShipToDeliveryLocationID,4),ShipToDeliveryLocationID)) as [ShipToDeliveryLocationID]
+
+		,Trim([Customer ID]) & '-' & if(IsNull(if ([Company Number Detail]='200',Right(ShipToDeliveryLocationID,4),ShipToDeliveryLocationID)),'0001',if ([Company Number Detail]='200',Right(ShipToDeliveryLocationID,4),ShipToDeliveryLocationID)) as [CustomerShipToAddressID]
+		//,Trim([Customer ID]) & '-' & if(IsNull([ShipToDeliveryLocationID]),'0001',[ShipToDeliveryLocationID]) as [CustomerShipToAddressID]
+		
+		,[Item Branch Key (ing org#)] as [Orginal Invoice]
+		,[Item Branch Key (ing org#)] as [Inventory Org]
+		
+		,[Order Number] 		as [Order Number]
+		,0 						as [Address Number]
+		,[Invoice Number] 		as [Invoice Number]
+		,[Doc Type] 			as [Doc Type]
+		,[UOM Standard] 		as [U/M]
+		
+		,0 						as [Ship Date]
+		,Num([Invoice Date]) 	as [Invoice Date]
+		,Num([Invoice Date]) 	as [Promised Delivery Date]
+		,Num([Invoice Date]) 	as [Date]
+		,Text(Date([Invoice Date],'YYYY')) as [MonthStoreFlag]
+		
+		,[Sales Quantity]				as [Sales Quantity]
+		,Alt(NUm#([Sales Quantity]),0) 	as [Sales Qty]
+		
+		,[GROSS Sales Amount   LC]
+		,Alt(Num#([GROSS Sales Amount   LC]),0) as [GROSS Sales Amount LC]
+
+		,[Returns]
+		,Alt(Num#([Returns]),0) as [Returns LC]
+
+		,[Sales Cost Amount LC (net see thru)] as [Sales Cost Amount LC (net see thru).src]
+		,Alt(Num#([Sales Cost Amount LC (net see thru)]),0) as [Sales Cost Amount LC (net see thru)]
+		
+		,if(([Company Number Detail])='AS', Alt(Num#([Sales Cost Amount LC (net see thru)]),0),Alt(Num#([Trxn COGS Amount]),0)) as [BASE_COGS]
+
+		,[Cost_Legal_Entity]
+		,Alt(Num#([Cost_Legal_Entity]),0) 	as [COST_LE]
+
+		,0 as [Settlement Discount LC]
+		
+		,[Trxn Sales Amount] 				as [Trxn Sales Amount.src]
+		,Alt(Num#([Trxn Sales Amount]),0) 	as [Trxn Sales Amount]
+		
+		,[Trxn COGS Amount]					as [Trxn COGS Amount.src]
+		,Alt(Num#([Trxn COGS Amount]),0) 	as [Trxn COGS Amount]
+
+		,[Trans Type]
+
+		,0 as [Co-op Rebate LC]
+		
+		,[Rebate_LC]
+		,Alt(Num#([Rebate_LC]),0) as [Rebates LC]
+		
+		,0 as [Volume Discount LC]
+		,0 as [BOGO]
+		,0 as [Slotting]
+		,0 as [TPR]
+		,0 as [Other]
+		
+		,[COGS adj1]				as [COGS Adj 1 LC.src]
+		,Alt(Num#([COGS adj1]),0) 	as [COGS Adj 1 LC]
+		
+		,0 as [COGS Adj 2 LC]
+		,0 as [Type of Discount #]
+		,0 as [Type of Discount Name]
+
+		,[Offer#] as [Offer #]
+		
+		,'Sales' as [Flag]
+		;
+SET pFileSpec = qvd;
+SET pCondition = (([Invoice Date]>=$(pStartDate) or alt(ApplyMap('mHReload',upper(FilePath()),0),0)=1) and [Invoice Date]< Num(MakeDate(2018,12,1)));
+
+
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition, pFileCheck, pStartDate);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+LET pCondition 	= Null(); 
+LET pFileCheck 	= Null();
+
+IF not IsNull(TableNumber('Sales_APAC_Gary')) then
+
+	Left Join ([Sales_APAC_Gary])
+		LOAD Distinct
+			 [RN]
+			,[FN]
+			,1 			as [QC]
+		Resident [Sales_APAC_Gary]
+		Where 
+			(not [COGS Adj 1 LC.src] 						= [COGS Adj 1 LC]) or
+			(not [COGS Trxn Currency] 						= [COGS_FinalCurrency]) or
+			(not [Cost_Legal_Entity] 						= [COST_LE]) or
+			(not [GROSS Sales Amount LC] 					= [GROSS Sales Amount LC]) or
+			(not [Rebate_LC] 								= [Rebates LC]) or
+			(not [Returns] 									= [Returns LC]) or
+			(not [Sales Cost Amount LC (net see thru).src]	= [Sales Cost Amount LC (net see thru)]) or
+			(not [Sales Quantity] 							= [Sales Qty]) or
+			(not [ShipToDeliveryLocationID.src] 			= [ShipToDeliveryLocationID]) or
+			(not [Trxn COGS Amount.src] 					= [Trxn COGS Amount]) or
+			(not [Trxn Currency] 							= [FinalCurrency]) or
+			(not [Trxn Sales Amount.src] 					= [Trxn Sales Amount]);
+
+
+	IF FieldValueCount('QC') > 0 then
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'COGS Adj 1 LC.src'							,'COGS Adj 1 LC'						,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'COGS Trxn Currency'						,'COGS_FinalCurrency'					,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Cost_Legal_Entity'							,'COST_LE'								,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'GROSS Sales Amount LC'						,'GROSS Sales Amount LC'				,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Rebate_LC'									,'Rebates LC'							,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Returns'									,'Returns LC'							,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Sales Cost Amount LC (net see thru).src'	,'Sales Cost Amount LC (net see thru)'	,vWhere);	
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Sales Quantity'							,'Sales Qty'							,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'ShipToDeliveryLocationID.src'				,'ShipToDeliveryLocationID'				,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Trxn COGS Amount.src'						,'Trxn COGS Amount'						,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Trxn Currency'								,'FinalCurrency'						,vWhere);
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage,'Trxn Sales Amount.src'						,'Trxn Sales Amount'					,vWhere);
+		LET vMessage = Null();
+	ENDIF
+
+	
+	
+	/*IF FieldValueCount('QC') > 0 then
+	
+		SET vMessage = 'Line #'&([RN])&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(not ([COGS Adj 1 LC.src] = [COGS Adj 1 LC]) ,';[COGS Adj 1 LC] "'&[COGS Adj 1 LC.src]&'". Replaced with "'&[COGS Adj 1 LC]&'";','')
+					&if(not ([COGS Trxn Currency] = [COGS_FinalCurrency]) ,';[COGS Trxn Currency] "'&[COGS Trxn Currency]&'". Replaced with "'&[COGS_FinalCurrency]&'";','')
+					&if(not ([Cost_Legal_Entity] = [COST_LE]) ,';[Cost_Legal_Entity] "'&[Cost_Legal_Entity]&'". Replaced with "'&[COST_LE]&'";','')
+					&if(not ([GROSS Sales Amount LC] = [GROSS Sales Amount LC]) ,';[GROSS Sales Amount LC] "'&[GROSS Sales Amount LC]&'". Replaced with "'&[GROSS Sales Amount LC]&'";','')
+					&if(not ([Rebate_LC] = [Rebates LC]) ,';[Rebate_LC] "'&[Rebate_LC]&'". Replaced with "'&[Rebates LC]&'";','')
+					&if(not ([Returns] = [Returns LC]) ,';[Returns] "'&[Returns]&'". Replaced with "'&[Returns LC]&'";','')
+					&if(not ([Sales Cost Amount LC (net see thru).src] = [Sales Cost Amount LC (net see thru)]) ,';[Sales Cost Amount LC (net see thru)] "'&[Sales Cost Amount LC (net see thru).src]&'". Replaced with "'&[Sales Cost Amount LC (net see thru)]&'";','')
+					&if(not ([Sales Quantity] = [Sales Qty]) ,';[Sales Quantity] "'&[Sales Quantity]&'". Replaced with "'&[Sales Qty]&'";','')
+					&if(not ([ShipToDeliveryLocationID.src] = [ShipToDeliveryLocationID]) ,';[ShipToDeliveryLocationID] "'&[ShipToDeliveryLocationID.src]&'". Replaced with "'&[ShipToDeliveryLocationID]&'";','')
+					&if(not ([Trxn COGS Amount.src] = [Trxn COGS Amount]) ,';[Trxn COGS Amount] "'&[Trxn COGS Amount.src]&'". Replaced with "'&[Trxn COGS Amount]&'";','')
+					&if(not ([Trxn Currency] = [FinalCurrency]) ,';[Trxn Currency] "'&[Trxn Currency]&'". Replaced with "'&[FinalCurrency]&'";','')
+					&if(not ([Trxn Sales Amount.src] = [Trxn Sales Amount]) ,';[Trxn Sales Amount] "'&[Trxn Sales Amount.src]&'". Replaced with "'&[Trxn Sales Amount]&'";','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('Sales_APAC_Gary',cWARNING,vMessage);
+		LET vMessage = Null();
+	
+	ENDIF;
+	*/
+	DROP Field [QC] From [Sales_APAC_Gary];
+
+	SET pFieldList = [FN]
+			,[RN]
+			,[Trxn Currency]
+			,[COGS Trxn Currency]
+			,[FinalCurrency]
+			,[COGS_FinalCurrency]
+			,[LocalCurrency]
+			,[Currency]
+			,[CompoundKey]
+			,[Entity]
+			,[Customer Number]
+			,[Product Number]
+			,[ShipToDeliveryLocationID]
+			,[CustomerShipToAddressID]
+			,[Orginal Invoice]
+			,[Inventory Org]
+			,[Order Number]
+			,[Address Number]
+			,[Invoice Number]
+			,[Doc Type]
+			,[U/M]
+			,[Ship Date]
+			,[Invoice Date]
+			,[Promised Delivery Date]
+			,[Date]
+			,[Sales Qty]
+			,[GROSS Sales Amount LC]
+			,[Returns LC]
+			,[Sales Cost Amount LC (net see thru)]
+			,[Trxn Sales Amount]
+			,[Trxn COGS Amount]
+			,[BASE_COGS]
+			,[COST_LE]
+			,[Settlement Discount LC]
+			,[Trans Type]
+			,[Co-op Rebate LC]
+			,[Rebates LC]
+			,[Volume Discount LC]
+			,[BOGO]
+			,[Slotting]
+			,[TPR]
+			,[Other]
+			,[COGS Adj 1 LC]
+			,[COGS Adj 2 LC]
+			,[Type of Discount #]
+			,[Type of Discount Name]
+			,[Offer #]
+			,[Flag]
+			;
+			
+	SET p_StartDate =  or Num(Date) < $(pStartDate);
+	CALL StoreIncremental('Sales_APAC_Gary',pFieldList,'MonthStoreFlag','Sales_APAC',p_StartDate);
+	LET pFieldList = Null();
+	CALL LogMessage('Sales_APAC_Gary',cSUCCESSFUL);
+	CALL DropTable('Sales_APAC_Gary');
+
+ENDIF;
+///$tab Jissbon
+
+
+SET pTable = Sales_APAC_Jissbon;
+SET pMask = APAC\Jissbon Qlik  Data\Jissbon-China Sales Data QVD\Sales_JissbonFinal.qvd;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,[Trxn Currency]
+		,if(
+			Alt(Len(Purgechar([Trxn Currency],$(vPurgeChars))),0)=0 or [Trxn Currency]=0
+			,[Currency]
+			,[Trxn Currency]
+			) as [FinalCurrency]
+
+		,[Currency] as [COGS Trxn Currency]
+		,if(
+			Alt(Len(Purgechar([Trxn Currency],$(vPurgeChars))),0)=0 or [Trxn Currency]=0
+			,[Currency]
+			,[Trxn Currency]
+			) as [COGS_FinalCurrency]
+
+		,trim([Currency]) as [LocalCurrency]
+		,trim([Currency]) as [Currency]
+		
+		,trim([Currency])&'-'&Text(Date([Invoice Date],'YYMM')) as [CompoundKey]
+		
+		,[Company Number Detail] 	as [Entity]
+		,Trim([CustomerID]) 		as [Customer Number]
+		,Trim([Item Number]) 		as [Product Number]
+		
+		,Trim([ShipToDeliveryLocationID]) as [ShipToDeliveryLocationID]
+		
+		,Trim([CustomerID]) & '-' & Trim([ShipToDeliveryLocationID]) as [CustomerShipToAddressID]
+		
+		,[Item Branch Key (inv org #)] as [Orginal Invoice]
+		,[Item Branch Key (inv org #)] as [Inventory Org]
+		
+		,[Order Number] 			as [Order Number]
+		,[Order Line Number] 		as [Address Number]
+		,[Invoice Number] 			as [Invoice Number]
+		,[Doc Type] 				as [Doc Type]
+		,[Ansell Std U/M] 			as [U/M]
+		
+		,Num([Ship Date]) 			as [Ship Date]
+		,Num([Invoice Date]) 		as [Invoice Date]
+		,Num([Invoice Date]) 		as [Promised Delivery Date]
+		,Num([Invoice Date]) 		as [Date]
+		,Text(Date([Invoice Date],'YYYY')) as [MonthStoreFlag]
+		
+		,[Sales Quantity] 				as [Sales Quantity]
+		,Alt(Num#([Sales Quantity]),0)	as [Sales Qty]
+		
+		,[GROSS Sales Amount   LC]
+		,Alt(Num#([GROSS Sales Amount   LC]),0) as [GROSS Sales Amount LC]
+
+		,0 as [Returns LC]
+
+		,[Sales Cost Amount LC (net see thru)] as [Sales Cost Amount LC (net see thru).src]
+		,Alt(Num#([Sales Cost Amount LC (net see thru)]),0) as [Sales Cost Amount LC (net see thru)]
+		,Alt(Num#([Sales Cost Amount LC (net see thru)]),0) as [BASE_COGS]
+
+		,[Sales Cost Amount Legal Entity]
+		,if(Alt(Len(([Sales Cost Amount Legal Entity])),0)=0,0,Alt(Num#([Sales Cost Amount Legal Entity]),0)) as [COST_LE]
+
+		,0 as [Settlement Discount LC]
+		
+		,[Trxn Sales Amount]				as [Trxn Sales Amount.src]
+		,Alt(Num#([Trxn Sales Amount]),0) 	as [Trxn Sales Amount]
+		
+		
+		,[Trxn COGS Amount]					as [Trxn COGS Amount.src]
+		,Alt(Num#([Trxn COGS Amount]),0) 	as [Trxn COGS Amount]
+
+		,[Trans Type]
+
+		,[Co-op Rebate LC] 					as [Co-op Rebate LC.src]
+		,Alt(Num#([Co-op Rebate LC]),0) 	as [Co-op Rebate LC]
+		
+		,[Rebates LC] 						as [Rebates LC.src]
+		,Alt(Num#([Rebates LC]),0) 			as [Rebates LC]
+		
+		,[Volume Discount LC] 				as [Volume Discount LC.src]
+		,Alt(Num#([Volume Discount LC]),0) 	as [Volume Discount LC]
+		
+		,[BOGO] 				as [BOGO.src]
+		,Alt(Num#([BOGO]),0) 	as [BOGO]
+		
+		,[Slotting] 				as [Slotting.src]
+		,Alt(Num#([Slotting]),0) 	as [Slotting]
+		
+		,[TPR] 				as [TPR.src]
+		,Alt(Num#([TPR]),0) as [TPR]
+		
+		,[Other] 				as [Other.src]
+		,Alt(Num#([Other]),0) 	as [Other]
+		
+		,0 as [COGS Adj 1 LC]
+		,0 as [COGS Adj 2 LC]
+		,[Type of Discount #]
+		,[Type of Discount Name]
+
+		,0 as [Offer #]
+		
+		,'Sales' as [Flag]
+		;
+SET pFileSpec = qvd;
+SET pCondition = ([Invoice Date]>=$(pStartDate) or alt(ApplyMap('mHReload',upper(FilePath()),0),0)=1);
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition, pFileCheck, pStartDate);
+LET pTable 		= Null(); 
+LET pMask 		= Null();
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+LET pCondition 	= Null(); 
+LET pFileCheck 	= Null();
+
+IF not IsNull(TableNumber('Sales_APAC_Jissbon')) then
+
+	Left Join ([Sales_APAC_Jissbon])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC]
+		Resident [Sales_APAC_Jissbon]
+		Where 
+			(not [BOGO.src] 								= [BOGO]) or
+			(not [Co-op Rebate LC.src] 						= [Co-op Rebate LC]) or
+			(not [COGS Trxn Currency] 						= [COGS_FinalCurrency]) or
+			(not [GROSS Sales Amount LC] 					= [GROSS Sales Amount LC]) or
+			(not [Other.src] 								= [Other]) or
+			(not [Rebates LC.src] 							= [Rebates LC]) or
+			(not [Sales Cost Amount LC (net see thru).src] 	= [Sales Cost Amount LC (net see thru)]) or
+			(not [Sales Cost Amount Legal Entity] 			= [COST_LE]) or
+			(not [Sales Quantity] 							= [Sales Qty]) or
+			(not [Slotting.src] 							= [Slotting]) or
+			(not [TPR.src] 									= [TPR]) or
+			(not [Trxn COGS Amount.src] 					= [Trxn COGS Amount]) or
+			(not [Trxn Currency] 							= [FinalCurrency]) or
+			(not [Trxn Sales Amount.src] 					= [Trxn Sales Amount]) or
+			(not [Volume Discount LC.src] 					= [Volume Discount LC]);
+
+	IF FieldValueCount('QC') > 0 then
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'BOGO.src'									,'BOGO'									,vWhere);
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'Co-op Rebate LC.src'						,'Co-op Rebate LC'						,vWhere);
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'COGS Trxn Currency'							,'COGS_FinalCurrency'					,vWhere);
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'GROSS Sales Amount LC'						,'GROSS Sales Amount LC'				,vWhere);
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'Other.src'									,'Other'								,vWhere);
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'Rebates LC.src'								,'Rebates LC'							,vWhere);
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'Sales Cost Amount LC (net see thru).src'	,'Sales Cost Amount LC (net see thru)'	,vWhere);
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'Sales Cost Amount Legal Entity'				,'COST_LE'								,vWhere);	
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'Sales Quantity'								,'Sales Qty'							,vWhere);
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'TPR.src'									,'TPR'									,vWhere);
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'Slotting.src'								,'Slotting'								,vWhere);
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'Trxn COGS Amount.src'						,'Trxn COGS Amount'						,vWhere);
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'Trxn Currency'								,'FinalCurrency'						,vWhere);
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'Trxn Sales Amount.src'						,'Trxn Sales Amount'					,vWhere);
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage,'Volume Discount LC.src'						,'Volume Discount LC'					,vWhere);	
+		LET vMessage = Null();
+	ENDIF
+	
+	
+	
+
+	/*
+	IF FieldValueCount('QC') > 0 then
+	
+		SET vMessage = 'Line #'&([RN])&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(not ([BOGO.src] = [BOGO]) ,';[BOGO] "'&[BOGO.src]&'". Replaced with "'&[BOGO]&'";','')
+					&if(not ([Co-op Rebate LC.src] = [Co-op Rebate LC]) ,';[Co-op Rebate LC] "'&[Co-op Rebate LC.src]&'". Replaced with "'&[Co-op Rebate LC]&'";','')
+					&if(not ([COGS Trxn Currency] = [COGS_FinalCurrency]) ,';[COGS Trxn Currency] "'&[COGS Trxn Currency]&'". Replaced with "'&[COGS_FinalCurrency]&'";','')
+					&if(not ([GROSS Sales Amount LC] = [GROSS Sales Amount LC]) ,';[GROSS Sales Amount LC] "'&[GROSS Sales Amount LC]&'". Replaced with "'&[GROSS Sales Amount LC]&'";','')
+					&if(not ([Other.src] = [Other]) ,';[Other] "'&[Other.src]&'". Replaced with "'&[Other]&'";','')
+					&if(not ([Rebates LC.src] = [Rebates LC]) ,';[Rebates LC] "'&[Rebates LC.src]&'". Replaced with "'&[Rebates LC]&'";','')
+					&if(not ([Sales Cost Amount LC (net see thru).src] = [Sales Cost Amount LC (net see thru)]) ,';[Sales Cost Amount LC (net see thru)] "'&[Sales Cost Amount LC (net see thru).src]&'". Replaced with "'&[Sales Cost Amount LC (net see thru)]&'";','')
+					&if(not ([Sales Cost Amount Legal Entity] = [COST_LE]) ,';[Sales Cost Amount Legal Entity] "'&[Sales Cost Amount Legal Entity]&'". Replaced with "'&[COST_LE]&'";','')
+					&if(not ([Sales Quantity] = [Sales Qty]) ,';[Sales Quantity] "'&[Sales Quantity]&'". Replaced with "'&[Sales Qty]&'";','')
+					&if(not ([Slotting.src] = [Slotting]) ,';[Slotting] "'&[Slotting.src]&'". Replaced with "'&[Slotting]&'";','')
+					&if(not ([TPR.src] = [TPR]) ,';[TPR] "'&[TPR.src]&'". Replaced with "'&[TPR]&'";','')
+					&if(not ([Trxn COGS Amount.src] = [Trxn COGS Amount]) ,';[Trxn COGS Amount] "'&[Trxn COGS Amount.src]&'". Replaced with "'&[Trxn COGS Amount]&'";','')
+					&if(not ([Trxn Currency] = [FinalCurrency]) ,';[Trxn Currency] "'&[Trxn Currency]&'". Replaced with "'&[FinalCurrency]&'";','')
+					&if(not ([Trxn Sales Amount.src] = [Trxn Sales Amount]) ,';[Trxn Sales Amount] "'&[Trxn Sales Amount.src]&'". Replaced with "'&[Trxn Sales Amount]&'";','')
+					&if(not ([Volume Discount LC.src] = [Volume Discount LC]) ,';[Volume Discount LC] "'&[Volume Discount LC.src]&'". Replaced with "'&[Volume Discount LC]&'";','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('Sales_APAC_Jissbon',cWARNING,vMessage);
+		LET vMessage = Null();
+	
+	ENDIF;
+	*/
+	DROP Field [QC] From [Sales_APAC_Jissbon];
+
+	SET pFieldList = [FN]
+			,[RN]
+			,[Trxn Currency]
+			,[COGS Trxn Currency]
+			,[FinalCurrency]
+			,[COGS_FinalCurrency]
+			,[LocalCurrency]
+			,[Currency]
+			,[CompoundKey]
+			,[Entity]
+			,[Customer Number]
+			,[Product Number]
+			,[ShipToDeliveryLocationID]
+			,[CustomerShipToAddressID]
+			,[Orginal Invoice]
+			,[Inventory Org]
+			,[Order Number]
+			,[Address Number]
+			,[Invoice Number]
+			,[Doc Type]
+			,[U/M]
+			,[Ship Date]
+			,[Invoice Date]
+			,[Promised Delivery Date]
+			,[Date]
+			,[Sales Qty]
+			,[GROSS Sales Amount LC]
+			,[Returns LC]
+			,[Sales Cost Amount LC (net see thru)]
+			,[Trxn Sales Amount]
+			,[Trxn COGS Amount]
+			,[BASE_COGS]
+			,[COST_LE]
+			,[Settlement Discount LC]
+			,[Trans Type]
+			,[Co-op Rebate LC]
+			,[Rebates LC]
+			,[Volume Discount LC]
+			,[BOGO]
+			,[Slotting]
+			,[TPR]
+			,[Other]
+			,[COGS Adj 1 LC]
+			,[COGS Adj 2 LC]
+			,[Type of Discount #]
+			,[Type of Discount Name]
+			,[Offer #]
+			,[Flag]
+			;
+			
+	SET p_StartDate =  or Num(Date) < $(pStartDate);
+	CALL StoreIncremental('Sales_APAC_Jissbon',pFieldList,'MonthStoreFlag','Sales_APAC',p_StartDate);
+	LET pFieldList = Null();
+	CALL LogMessage('Sales_APAC_Jissbon',cSUCCESSFUL);
+	CALL DropTable('Sales_APAC_Jissbon');
+
+ENDIF;
+///$tab Ramco
+SET pTable = Sales_APAC_Ramco;
+SET pMask = APAC\RAMCO\Transaction\Sales*.qvd;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,[Trxn Currency]
+		,if(
+			Alt(Len(Purgechar([Trxn Currency],$(vPurgeChars))),0)=0 or [Trxn Currency]=0
+			,[Currency]
+			,[Trxn Currency]
+			) as [FinalCurrency]
+
+		,[COGS Trxn Currency] as [COGS Trxn Currency]
+		,if(
+			Alt(Len(Purgechar([COGS Trxn Currency],$(vPurgeChars))),0)=0 or [COGS Trxn Currency]=0
+			,[Currency]
+			,[COGS Trxn Currency]
+			) as [COGS_FinalCurrency]
+
+		,trim([Currency]) as [LocalCurrency]
+		,trim([Currency]) as [Currency]
+		
+		,[Currency]&'-'&Text(Date([Invoice Date],'YYMM')) as [CompoundKey]
+		
+		,Text([Company Number Detail]) 	as [Entity]
+		,Text([CustomerID]) 			as [Customer Number]
+		,Text(trim([Item Number])) 		as [Product Number]
+		
+		,Trim([ShipToDeliveryLocationID]) as [ShipToDeliveryLocationID]		
+		,Text([CustomerID])&'-'&Trim([ShipToDeliveryLocationID]) as [CustomerShipToAddressID]
+		
+		,[Item Branch Key (inv org #)] as [Orginal Invoice]
+		,[Item Branch Key (inv org #)] as [Inventory Org]
+		
+		,[Order Number]
+		,[Order Line Number] 	as [Address Number]
+		,[Invoice Number]
+		,[Doc Type]
+		,[Ansell Std U/M] 		as [U/M]
+		
+		,Num([Ship Date]) 		as [Ship Date]
+		,Num([Invoice Date]) 	as [Invoice Date]
+		,Num([Invoice Date]) 	as [Promised Delivery Date]
+		,Num([Invoice Date]) 	as [Date]
+		,Text(Date([Invoice Date],'YYYY')) as [MonthStoreFlag]
+		
+		,[Sales Quantity]
+		,Alt(Num#([Sales Quantity]),0) as [Sales Qty]
+		
+		,[GROSS Sales Amount   LC]
+		,Alt(Num#([GROSS Sales Amount   LC]),0) as [GROSS Sales Amount LC]
+
+		,[Returns LC] 				as [Returns LC.src]
+		,Alt(Num#([Returns LC]),0) 	as [Returns LC]
+
+		,[Sales Cost Amount LC (net see thru)] as [Sales Cost Amount LC (net see thru).src]
+		,Alt(Num#([Sales Cost Amount LC (net see thru)]),0) as [Sales Cost Amount LC (net see thru)]
+		,Alt(Num#([Sales Cost Amount LC (net see thru)]),0) as [BASE_COGS]
+
+		,[Sales Cost Amount Legal Entity]
+		,if(Alt(Len(Trim([Sales Cost Amount Legal Entity])),0)=0,0,Alt(Num#([Sales Cost Amount Legal Entity]),0)) as [COST_LE]
+
+		,[Settlement Discount LC] as [Settlement Discount LC.src]
+		,Alt(Num#([Settlement Discount LC]),0) as [Settlement Discount LC]
+		
+		,[Trxn Sales Amount]				as [Trxn Sales Amount.src]
+		,Alt(Num#([Trxn Sales Amount]),0)	as [Trxn Sales Amount]
+		
+		,[Trxn COGS Amount]					as [Trxn COGS Amount.src]
+		,Alt(Num#([Trxn COGS Amount]),0)	as [Trxn COGS Amount]
+
+		,[Trans Type]
+
+		,[Co-op Rebate LC] 				as [Co-op Rebate LC.src]
+		,Alt(Num#([Co-op Rebate LC]),0) as [Co-op Rebate LC]
+
+		,[Rebates LC] 				as [Rebates LC.src]
+		,Alt(Num#([Rebates LC]),0) 	as [Rebates LC]
+
+		,[Volume Discount LC] 				as [Volume Discount LC.src]
+		,Alt(Num#([Volume Discount LC]),0) 	as [Volume Discount LC]
+
+		,[BOGO] 				as [BOGO.src]
+		,Alt(Num#([BOGO]),0) 	as [BOGO]
+
+		,[Slotting] 				as [Slotting.src]
+		,Alt(Num#([Slotting]),0) 	as [Slotting]
+
+		,[TPR] 					as [TPR.src]
+		,Alt(Num#([TPR]),0) 	as [TPR]
+
+		,[Other] 				as [Other.src]
+		,Alt(Num#([Other]),0) 	as [Other]
+
+		,[COGS Adj 1 LC]				as [COGS Adj 1 LC.src]
+		,Alt(Num#([COGS Adj 1 LC]),0) 	as [COGS Adj 1 LC]
+		
+		,[COGS Adj 2 LC]				as [COGS Adj 2 LC.src]
+		,Alt(Num#([COGS Adj 2 LC]),0) 	as [COGS Adj 2 LC]
+		
+		,[Type of Discount #]
+		,[Type of Discount Name]
+
+		,[Offer #]
+		
+		,'Sales' as [Flag]
+		;
+SET pFileSpec = qvd;
+LET pFileCheck = Null();
+SET pCondition = (Num(MonthStart([Invoice Date]))>41791) and ([Invoice Date]>=$(pStartDate) or alt(ApplyMap('mHReload',upper(FilePath()),0),0)=1);
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition, pFileCheck, pStartDate);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+LET pCondition 	= Null(); 
+LET pFileCheck 	= Null();
+
+IF not IsNull(TableNumber('Sales_APAC_Ramco')) then
+
+	Left Join ([Sales_APAC_Ramco])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC]
+		Resident [Sales_APAC_Ramco]
+		Where 
+			(not [BOGO.src] 								= [BOGO]) or
+			(not [Co-op Rebate LC.src] 						= [Co-op Rebate LC]) or
+			(not [COGS Adj 1 LC.src] 						= [COGS Adj 1 LC]) or
+			(not [COGS Adj 2 LC.src] 						= [COGS Adj 2 LC]) or
+			(not [COGS Trxn Currency] 						= [COGS_FinalCurrency]) or
+			(not [GROSS Sales Amount LC] 					= [GROSS Sales Amount LC]) or
+			(not [Other.src] 								= [Other]) or
+			(not [Rebates LC.src] 							= [Rebates LC]) or
+			(not [Returns LC.src] 							= [Returns LC]) or
+			(not [Sales Cost Amount LC (net see thru).src] 	= [Sales Cost Amount LC (net see thru)]) or
+			(not [Sales Cost Amount Legal Entity] 			= [COST_LE]) or
+			(not [Sales Quantity] 							= [Sales Qty]) or
+			(not [Settlement Discount LC.src] 				= [Settlement Discount LC]) or
+			(not [Slotting.src] 							= [Slotting]) or
+			(not [TPR.src] 									= [TPR]) or
+			(not [Trxn COGS Amount.src] 					= [Trxn COGS Amount]) or
+			(not [Trxn Currency] 							= [FinalCurrency]) or
+			(not [Trxn Sales Amount.src] 					= [Trxn Sales Amount]) or
+			(not [Volume Discount LC.src] 					= [Volume Discount LC]) ;
+
+	IF FieldValueCount('QC') > 0 then
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'BOGO.src'									,'BOGO'									,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'Co-op Rebate LC.src'						,'Co-op Rebate LC'						,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'COGS Adj 1 LC.src'						,'COGS Adj 1 LC'						,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'COGS Adj 2 LC.src'						,'COGS Adj 2 LC'						,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'COGS Trxn Currency'						,'COGS_FinalCurrency'					,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'GROSS Sales Amount LC'					,'GROSS Sales Amount LC'				,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'Other.src'								,'Other'								,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'Rebates LC.src'							,'Rebates LC'							,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'Returns LC.src'							,'Returns LC'							,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'Sales Cost Amount LC (net see thru).src'	,'Sales Cost Amount LC (net see thru)'	,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'Sales Cost Amount Legal Entity'			,'COST_LE'								,vWhere);	
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'Sales Quantity'							,'Sales Qty'							,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'Settlement Discount LC.src'				,'Settlement Discount LC'				,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'TPR.src'									,'TPR'									,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'Slotting.src'								,'Slotting'								,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'Trxn COGS Amount.src'						,'Trxn COGS Amount'						,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'Trxn Currency'							,'FinalCurrency'						,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'Trxn Sales Amount.src'					,'Trxn Sales Amount'					,vWhere);
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage,'Volume Discount LC.src'					,'Volume Discount LC'					,vWhere);	
+		LET vMessage = Null();
+	ENDIF
+	
+	
+	
+
+
+	/*IF FieldValueCount('QC') > 0 then
+	
+		SET vMessage = 'Line #'&([RN])&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(not ([BOGO.src] = [BOGO]) ,';[BOGO] "'&[BOGO.src]&'". Replaced with "'&[BOGO]&'";','')
+					&if(not ([Co-op Rebate LC.src] = [Co-op Rebate LC]) ,';[Co-op Rebate LC] "'&[Co-op Rebate LC.src]&'". Replaced with "'&[Co-op Rebate LC]&'";','')
+					&if(not ([COGS Adj 1 LC.src] = [COGS Adj 1 LC]) ,';[COGS Adj 1 LC] "'&[COGS Adj 1 LC.src]&'". Replaced with "'&[COGS Adj 1 LC]&'";','')
+					&if(not ([COGS Adj 2 LC.src] = [COGS Adj 2 LC]) ,';[COGS Adj 2 LC] "'&[COGS Adj 2 LC.src]&'". Replaced with "'&[COGS Adj 2 LC]&'";','')
+					&if(not ([COGS Trxn Currency] = [COGS_FinalCurrency]) ,';[COGS Trxn Currency] "'&[COGS Trxn Currency]&'". Replaced with "'&[COGS_FinalCurrency]&'";','')
+					&if(not ([GROSS Sales Amount LC] = [GROSS Sales Amount LC]) ,';[GROSS Sales Amount LC] "'&[GROSS Sales Amount LC]&'". Replaced with "'&[GROSS Sales Amount LC]&'";','')
+					&if(not ([Other.src] = [Other]) ,';[Other] "'&[Other.src]&'". Replaced with "'&[Other]&'";','')
+					&if(not ([Rebates LC.src] = [Rebates LC]) ,';[Rebates LC] "'&[Rebates LC.src]&'". Replaced with "'&[Rebates LC]&'";','')
+					&if(not ([Returns LC.src] = [Returns LC]) ,';[Returns LC] "'&[Returns LC.src]&'". Replaced with "'&[Returns LC]&'";','')
+					&if(not ([Sales Cost Amount LC (net see thru).src] = [Sales Cost Amount LC (net see thru)]) ,';[Sales Cost Amount LC (net see thru)] "'&[Sales Cost Amount LC (net see thru).src]&'". Replaced with "'&[Sales Cost Amount LC (net see thru)]&'";','')
+					&if(not ([Sales Cost Amount Legal Entity] = [COST_LE]) ,';[Sales Cost Amount Legal Entity] "'&[Sales Cost Amount Legal Entity]&'". Replaced with "'&[COST_LE]&'";','')
+					&if(not ([Sales Quantity] = [Sales Qty]) ,';[Sales Quantity] "'&[Sales Quantity]&'". Replaced with "'&[Sales Qty]&'";','')
+					&if(not ([Settlement Discount LC.src] = [Settlement Discount LC]) ,';[Settlement Discount LC] "'&[Settlement Discount LC.src]&'". Replaced with "'&[Settlement Discount LC]&'";','')
+					&if(not ([Slotting.src] = [Slotting]) ,';[Slotting] "'&[Slotting.src]&'". Replaced with "'&[Slotting]&'";','')
+					&if(not ([TPR.src] = [TPR]) ,';[TPR] "'&[TPR.src]&'". Replaced with "'&[TPR]&'";','')
+					&if(not ([Trxn COGS Amount.src] = [Trxn COGS Amount]) ,';[Trxn COGS Amount] "'&[Trxn COGS Amount.src]&'". Replaced with "'&[Trxn COGS Amount]&'";','')
+					&if(not ([Trxn Currency] = [FinalCurrency]) ,';[Trxn Currency] "'&[Trxn Currency]&'". Replaced with "'&[FinalCurrency]&'";','')
+					&if(not ([Trxn Sales Amount.src] = [Trxn Sales Amount]) ,';[Trxn Sales Amount] "'&[Trxn Sales Amount.src]&'". Replaced with "'&[Trxn Sales Amount]&'";','')
+					&if(not ([Volume Discount LC.src] = [Volume Discount LC]) ,';[Volume Discount LC] "'&[Volume Discount LC.src]&'". Replaced with "'&[Volume Discount LC]&'";','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('Sales_APAC_Ramco',cWARNING,vMessage);
+		LET vMessage = Null();
+	
+	ENDIF;*/
+
+	DROP Field [QC] From [Sales_APAC_Ramco];
+
+	SET pFieldList = [FN]
+			,[RN]
+			,[Trxn Currency]
+			,[COGS Trxn Currency]
+			,[FinalCurrency]
+			,[COGS_FinalCurrency]
+			,[LocalCurrency]
+			,[Currency]
+			,[CompoundKey]
+			,[Entity]
+			,[Customer Number]
+			,[Product Number]
+			,[ShipToDeliveryLocationID]
+			,[CustomerShipToAddressID]
+			,[Orginal Invoice]
+			,[Inventory Org]
+			,[Order Number]
+			,[Address Number]
+			,[Invoice Number]
+			,[Doc Type]
+			,[U/M]
+			,[Ship Date]
+			,[Invoice Date]
+			,[Promised Delivery Date]
+			,[Date]
+			,[Sales Qty]
+			,[GROSS Sales Amount LC]
+			,[Returns LC]
+			,[Sales Cost Amount LC (net see thru)]
+			,[Trxn Sales Amount]
+			,[Trxn COGS Amount]
+			,[BASE_COGS]
+			,[COST_LE]
+			,[Settlement Discount LC]
+			,[Trans Type]
+			,[Co-op Rebate LC]
+			,[Rebates LC]
+			,[Volume Discount LC]
+			,[BOGO]
+			,[Slotting]
+			,[TPR]
+			,[Other]
+			,[COGS Adj 1 LC]
+			,[COGS Adj 2 LC]
+			,[Type of Discount #]
+			,[Type of Discount Name]
+			,[Offer #]
+			,[Flag]
+			;
+	
+	SET p_StartDate =  or Num(Date) < $(pStartDate);
+	CALL StoreIncremental('Sales_APAC_Ramco',pFieldList,'MonthStoreFlag','Sales_APAC',p_StartDate);
+	LET pFieldList = Null();
+	CALL LogMessage('Sales_APAC_Ramco',cSUCCESSFUL);
+
+	CALL DropTable('Sales_APAC_Ramco');
+
+ENDIF;
+///$tab Logs
+
+CALL DelLog ('$(vLOGPath)','$(vLogDocPrefixName)',$(vLogCountSaveLoad))
+
+LET vReloadTime = Timestamp(vReloadTime,'YYYYMMDDhhmmss');
+
+LOG:
+LOAD
+	RecNo() as [LOG.RN]
+	,[Module]
+	,[ReloadTime]
+	,[TABLE]
+	,[STATUS]
+	,IF(STATUS = 'WARNING','Line #'&([REC_NO])&' in field ['&[MESSAGE]&'] data was replaced from value "'&FromValue&'" to value "'&ToValue&'"
+	Source file: "'&FN&'"', MESSAGE)	as MESSAGE
+	,REC_NO
+    ,FromValue
+    ,ToValue
+	,if([STATUS] = 'WARNING ON DOUBLES'
+		,'DOUBLES'
+		,TextBetween([MESSAGE],'[',']',1)) as [FILENAME],
+	FN									as [File name]
+FROM
+[$(vLOGPath)$(vLogDocPrefixName)*$(vReloadTime).qvd]
+(qvd)
+//Where Upper([Module]) = Upper(DocumentPath())
+;
+	
+	[Log_Error]:
+	LOAD 	Module,
+			STATUS,
+			//TABLE,
+			COUNT(STATUS) as QtyWorning
+	Resident LOG
+	Where STATUS <> 'FAILURE'
+	Group BY 	Module,
+				STATUS/*,
+				TABLE*/;
+	
+	IF NoOfFields('Log_Error') then	
+		STORE Log_Error into '$(vLOGPath)$(vLogTotalPrefixName)Error_$(vReloadTime).qvd' (qvd);
+		
+		DROP Table Log_Error;
+	ENDIF	
+
+	CALL DelLog ('$(vLOGPath)','$(vLogDocPrefixName)',$(vLogCountSaveLoad))
+	
+		[Log_FAILURE]:
+		NoConcatenate LOAD 	*
+		Resident LOG
+		Where STATUS = 'FAILURE';
+	
+	IF NoOfFields('Log_FAILURE') then	
+		STORE Log_FAILURE into '$(vLOGPath)$(vLogTotalPrefixName)FAILURE_$(vReloadTime).qvd' (qvd);
+		
+		DROP Table Log_FAILURE;
+	ENDIF	
+
+	CALL DelLog ('$(vLOGPath)','$(vLogTotalPrefixName)',$(vLogCountSaveLoad))
+///$tab Mail
+CALL FailuresInTransformMessage('');
+///$tab Exit script
+EXIT SCRIPT;

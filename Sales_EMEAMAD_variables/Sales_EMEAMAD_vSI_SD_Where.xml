@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vSI_SD_Where</Name>
+    <Content>or Num(Date) &lt; 44470</Content>
+  </Variable>
+</Variables>

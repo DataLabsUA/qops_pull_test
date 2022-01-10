@@ -1,0 +1,1242 @@
+﻿///$tab License
+/*************************************************************************
+* 
+* Ansell Healthcare, LLC
+* DVSTS Ltd.
+* CONFIDENTIAL
+* __________________
+* 
+* 2016 Ansell Healthcare, LLC 
+* 2016 DVSTS Ltd. 
+* All Rights Reserved.
+* 
+* NOTICE:  All information contained herein is, and remains
+* the property of Ansell Healthcare, LLC and DVSTS Ltd. The
+* intellectual and technical concepts contained herein are
+* proprietary to Ansell Healthcare, LLC and DVSTS Ltd. and
+* may be covered by U.S. and Foreign Patents, patents in
+* process, and are protected by trade secret or copyright
+* law. Dissemination of this information or reproduction of
+* this material is strictly forbidden unless prior written
+* permission is obtained from Ansell Healthcare, LLC.
+*************************************************************************/
+ 
+///$tab Main
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='₹ #,##0.00;₹ -#,##0.00';
+SET TimeFormat='hh:mm:ss';
+SET DateFormat='MM/DD/YYYY';
+SET TimestampFormat='MM/DD/YYYY hh:mm:ss[.fff]';
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+
+LET vReloadTime = Num(Now(),'##############');
+
+$(Include=.\Sales_Ringerssettings.qvs);
+
+LET vSrcPath = if(Right(vSrcPath,1) = '\',vSrcPath,vSrcPath&'\');
+LET vQVDPath = if(Right(vQVDPath,1) = '\',vQVDPath,vQVDPath&'\');
+
+$(Include=$(vINCPath)procedures.qvs);
+$(Include=$(vINCPath)\transformmailprocedures.qvs);
+
+SET vPurgeChars = Chr(9)&Chr(10)&Chr(13)&Chr(32)&Chr(160)&Chr(12288)&'-';
+SET vRegionList = 'NA','EMEA', 'APAC' ,'Central','LAC','Microgard';
+
+IF vReloadAll then
+
+	EXECUTE powershell -Command "& {remove-item '$(vQVDPath)Sales_Ringers-*.qvd' -Force}";
+
+	LET vReloadAll = False();
+
+ENDIF
+
+EXECUTE powershell -Command "& {remove-item '$(vQVDPath)Budget_Ringers-*.qvd' -Force}";
+EXECUTE powershell -Command "& {remove-item '$(vQVDPath)Forecast_Ringers-*.qvd' -Force}";
+
+CALL FindStartDate('Sales_Ringers', 'pStartDate');
+LET pStartDate = RangeMin(pStartDate,alt(vIncStartDate+1,MonthStart(Today(0)-45,-1)));
+///$tab Ringers Update
+IF alt(v01Update,0)=1 THEN
+
+	FOR Each vFile in FileList('$(vQVDPath)Sales_Ringers-*.qvd')
+	
+		SET vProdSrcPath = \\ansqlik3\QlikviewAuto\SalesMargin\Ringers\;
+		//SET vSrcPathNew  = D:\ANQVUAT3License\GIS 2.0 R2019-10 UAT\_SRC\Transaction\Ringers\; 
+		SET vSrcPathNew  = \\ansqlik3\QlikviewAuto\SalesMargin\Transaction\Ringers\; 
+		
+		t:
+		LOAD  
+			if([FN] like '$(vProdSrcPath)*',text(Replace([FN],'$(vProdSrcPath)','$(vSrcPathNew)')),[FN]) as [Hist_FN]
+    		 ,*
+		FROM
+		[$(vFile)]
+		(qvd);
+		
+		DROP Field [FN] from t;
+		RENAME Field [Hist_FN] to [FN];
+		
+		STORE t into '$(vFile)' (qvd);
+		
+		DROP table t;
+
+	
+	NEXT vFile;
+	
+	LET v01Update = Null();
+	
+	LET vProdSrcPath = Null();
+	LET vSrcPathNew  = Null(); 
+
+ENDIF;
+
+LET vFile = Null();
+///$tab Ringers
+SET pTable = Ringers_Sales;
+SET pMask = Transaction\Ringers\JAM-Sales*.xlsx;
+
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,'USD' as [Trxn Currency]
+		,'USD' as [COGS Trxn Currency]
+		,'USD' as [FinalCurrency]
+		,'USD' as [COGS_FinalCurrency]
+		,'USD' as [LocalCurrency]
+		,'USD' as [Currency]
+		
+		,'USD'&'-'&Text(Date([Date],'YYMM')) as [CompoundKey]
+		
+		,Text([Sub ID])	as [Entity]
+		
+		,Text(pick(alt(WildMatch(upper([Source]),'WEB (RINGERS GLOVES)','WEB (VALEO SAFETY)','WEB (VALEO FITNESS)'),0)+1,if([CID] like 'R-*',[CID],'R-'&[CID]),1,2,3)) as [Customer Number]
+		
+		,Text(trim([Item])) 			as [Product Number]
+			
+		,0 as [ShipToDeliveryLocationID]  
+		,0 as [CustomerShipToAddressID]  
+		
+		//,'Ringers' 						as [Orginal Invoice]	
+		//,'Ringers' 						as [Inventory Org]	
+		
+		,if(alt(len(Trim([Location])),0)>0,[Location],'Ringers') as [Orginal Invoice]			
+		,if(alt(len(Trim([Location])),0)>0,[Location],'Ringers') as [Inventory Org]
+		
+		,0 as [Order Number]
+		,0 as [Address Number]
+		
+		,'JAM '& MonthName([Date]) 		as [Invoice Number]	
+		,'INV' 							as [Doc Type]
+		,'PR' 							as [U/M]
+		
+		,Num([Date]) 					as [Ship Date]
+		,Num([Date]) 					as [Invoice Date]
+		,Num([Date])		 			as [Promised Delivery Date]
+		,Num([Date]) 					as [Date]
+		,Text(Date([Date],'YYYY')) 		as [MonthStoreFlag]
+		
+		,[Quantity] 					as [Sales Quantity]
+		,Alt(Num#([Quantity]),0) 		as [Sales Qty]
+		
+		,[Total Revenue] 				as [GROSS Sales Amount   LC]
+		,Alt(NUM#([Total Revenue]),0) 	as [GROSS Sales Amount LC]
+
+		,0 								as [Returns LC]
+
+		,[Total Cost] 										as [Sales Cost Amount LC (net see thru).src]
+		,Alt(Num#([Total Cost]),0) 							as [Sales Cost Amount LC (net see thru)]
+		,Alt(Num#([Total Cost]),0) 							as [BASE_COGS]
+
+		,[Total Cost] 										as [Sales Cost Amount Legal Entity]
+		,$(eEmptyCheck(Num#([Total Cost]),0))				as [COST_LE]
+
+		,0 													as [Settlement Discount LC]
+		
+		,[Total Revenue]									as [Trxn Sales Amount.src]
+		,Alt(NUM#([Total Revenue]),0) 						as [Trxn Sales Amount]
+		
+		,[Total Cost] 										as [Trxn COGS Amount.src]
+		,Alt(NUM#([Total Cost]),0) 							as [Trxn COGS Amount]
+
+		,'Standard' as [Trans Type]
+
+		,0 as [Co-op Rebate LC]
+		,0 as [Rebates LC]
+		,0 as [Volume Discount LC]
+		,0 as [BOGO]
+		,0 as [Slotting]
+		,0 as [TPR]	
+		,0 as [Other]
+		,0 as [COGS Adj 1 LC]
+		,0 as [COGS Adj 2 LC]
+		,0 as [Type of Discount #]
+		,0 as [Type of Discount Name]
+
+		,0 as [Offer #]
+		
+		,'Sales' as [Flag]
+		
+		,Null() as [PO Number]
+		
+		,[Ultimate Destination (New): Ansell Region] as [Region]
+		,[Ultimate Destination (New): Ansell SubRegion] as [Sub-region]
+		,[Ultimate Destination (New)] as [Country]
+		,[Address: Shipping Address State] as [State]
+		,[Ship To Zip Code] as [PostalCode]
+		,Null() as [City] 
+		
+		 
+
+      	,if(alt(WildMatch(Upper([Customer]), '*AMAZON*','*WALMART*','*ISN*'),0)>0,'e-commerce'
+	        ,if(alt(WildMatch([Sub ID],'3','4','8'),0)>0
+	      		,if(upper([Ultimate Destination (New): Ansell Region]) like 'NA'
+	      			,if(Upper([Item: Board Class]) like '*PRIVATE LABEL*','Private Label',if(Upper([Source]) like '*WEB (RINGERS GLOVES)*','Ringers: e-commerce','NAM Industrial'))
+	      		,'International')
+	      	,if(alt(WildMatch([Sub ID],'11'),0)>0
+	      		,if(alt(WildMatch(upper([Source]),'*WEB (VALEO SAFETY)*','*WEB (VALEO FITNESS)*'),0)>0,'Valeo: e-commerce',if(Upper(CID) like 'VF-*','Valeo: Retail fitness',if(Upper(CID) like 'V-*','Valeo: Industrial Safety',null())))
+	      		,null())) 
+	      		
+	   )   		
+       
+       as [Customer Roll Up]
+
+		;
+	
+SET pFileSpec = ooxml, embedded labels, header is 6 lines, table is JAMSalesbyCustomerbyGlove;
+SET pCondition = ([Date] >= $(pStartDate) or alt(ApplyMap('mHReload',upper(FilePath()),0),0)=1) and alt(len(Date),0)>0
+				and (not (
+						((alt(len(trim([Item: Parent Item (Size & Color Grouped)])),0)=0) and (alt(len(trim([Item: Board Class])),0)=0))
+						or ((alt(len(trim([Ultimate Destination (New): Ansell Region])),0)=0) and (alt(len(trim([Ultimate Destination (New): Ansell SubRegion])),0)=0))
+				))
+				
+				and 
+				
+				(
+				(alt(WildMatch(upper([CID]),'96000:*'),0)=0)
+				or
+				 (Num([Date])<num(makedate(2019,9,1)))   
+				  )
+				  
+				 and (alt(WildMatch([CID],'x-*'),0)=0)
+				
+				;
+
+SET pFileCheck = if(
+ monthstart(addmonths(date(date#(left(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),3)&Right(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),2),'MMMYY')),if(month(date(date#(left(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),3)&Right(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),2),'MMMYY')))>6,-12,0)))<makedate(2021,5,1)
+ ,date(monthstart(addmonths(date(date#(left(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),3)&Right(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),2),'MMMYY')),if(month(date(date#(left(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),3)&Right(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),2),'MMMYY')))>6,-12,0))),'YYYYMMDD')
+  &'-'&date(monthend(addmonths(date(date#(left(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),3)&Right(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),2),'MMMYY')),if(month(date(date#(left(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),3)&Right(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),2),'MMMYY')))>6,-12,0))),'YYYYMMDD')
+ ,'00000000-00000000');
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition,pFileCheck,pStartDate);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+LET pCondition 	= Null(); 
+LET pFileCheck 	= Null();
+
+IF not IsNull(TableNumber('Ringers_Sales')) then
+
+
+	Left Join ([Ringers_Sales])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC]
+		Resident [Ringers_Sales]
+		Where 
+			(not [Trxn COGS Amount.src] 					= [Trxn COGS Amount]) or 
+			(not [Trxn Sales Amount.src] 					= [Trxn Sales Amount]) or
+			(not [GROSS Sales Amount   LC]        			= [GROSS Sales Amount LC]) or
+			(not [Sales Cost Amount LC (net see thru).src]	= [Sales Cost Amount LC (net see thru)]) or
+			(not [Sales Cost Amount Legal Entity]        	= [COST_LE]) or
+			(not [Sales Quantity]        					= [Sales Qty])
+			
+			;
+
+	IF FieldValueCount('QC') > 0 then
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('Ringers_Sales',cWARNING,vMessage,'GROSS Sales Amount   LC'	,'GROSS Sales Amount LC'	,vWhere);
+		CALL LogMessage('Ringers_Sales',cWARNING,vMessage,'Sales Cost Amount LC (net see thru).src','Sales Cost Amount LC (net see thru)'		,vWhere);
+		CALL LogMessage('Ringers_Sales',cWARNING,vMessage,'Sales Cost Amount Legal Entity','COST_LE'			,vWhere);
+		CALL LogMessage('Ringers_Sales',cWARNING,vMessage,'Sales Quantity'			,'Sales Qty'				,vWhere);
+		CALL LogMessage('Ringers_Sales',cWARNING,vMessage,'Trxn Sales Amount.src'			,'Trxn Sales Amount'				,vWhere);
+		CALL LogMessage('Ringers_Sales',cWARNING,vMessage,'Trxn COGS Amount.src'			,'Trxn COGS Amount'				,vWhere);
+		LET vWhere = Null();
+	ENDIF
+	
+	
+	DROP Field [QC] From [Ringers_Sales];
+
+	SET pFieldList = [FN]
+			,[RN]
+			,[Trxn Currency]
+			,[COGS Trxn Currency]
+			,[FinalCurrency]
+			,[COGS_FinalCurrency]
+			,[LocalCurrency]
+			,[Currency]
+			,[CompoundKey]
+			,[Entity]
+			,[Customer Number]
+			,[Product Number]
+			,[ShipToDeliveryLocationID]
+			,[CustomerShipToAddressID]
+			,[Orginal Invoice]
+			,[Inventory Org]
+			,[Order Number]
+			,[Address Number]
+			,[Invoice Number]
+			,[Doc Type]
+			,[U/M]
+			,[Ship Date]
+			,[Invoice Date]
+			,[Promised Delivery Date]
+			,[Date]
+			,[Sales Qty]
+			,[GROSS Sales Amount LC]
+			,[Returns LC]
+			,[Sales Cost Amount LC (net see thru)]
+			,[Trxn Sales Amount]
+			,[Trxn COGS Amount]
+			,[BASE_COGS]
+			,[COST_LE]
+			,[Settlement Discount LC]
+			,[Trans Type]
+			,[Co-op Rebate LC]
+			,[Rebates LC]
+			,[Volume Discount LC]
+			,[BOGO]
+			,[Slotting]
+			,[TPR]
+			,[Other]
+			,[COGS Adj 1 LC]
+			,[COGS Adj 2 LC]
+			,[Type of Discount #]
+			,[Type of Discount Name]
+			,[Offer #]
+			,[Flag]
+			,[Region]
+			,[Sub-region]
+			,[Country]
+			,[State]
+			,[PostalCode]
+			,[City]
+			,[Customer Roll Up]
+			,[PO Number]
+			;
+	
+//	SET p_StartDate =  or Num(Date) < $(pStartDate);
+//	CALL StoreIncremental('Ringers_Sales',pFieldList,'MonthStoreFlag','Sales_Ringers',p_StartDate);
+//	LET pFieldList = Null();
+//	CALL LogMessage('Ringers_Sales',cSUCCESSFUL);
+//
+//	CALL DropTable('Ringers_Sales');
+
+ENDIF;
+
+///$tab New Ringers fields
+SET pTable = Ringers_Sales2;
+SET pMask = Transaction\Ringers\JAM-Sales*.xlsx;
+
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,'USD' as [Trxn Currency]
+		,'USD' as [COGS Trxn Currency]
+		,'USD' as [FinalCurrency]
+		,'USD' as [COGS_FinalCurrency]
+		,'USD' as [LocalCurrency]
+		,'USD' as [Currency]
+		
+		,'USD'&'-'&Text(Date([Date],'YYMM')) as [CompoundKey]
+		
+		,Text([Sub ID])	as [Entity]
+		
+		,Text(pick(alt(WildMatch(upper([Source]),'WEB (RINGERS GLOVES)','WEB (VALEO SAFETY)','WEB (VALEO FITNESS)'),0)+1,if([CID] like 'R-*',[CID],'R-'&[CID]),1,2,3)) as [Customer Number]
+		
+		,Text(trim([Item])) 			as [Product Number]
+			
+		,0 as [ShipToDeliveryLocationID]  
+		,0 as [CustomerShipToAddressID]  
+		
+		//,'Ringers' 						as [Orginal Invoice]	
+		//,'Ringers' 						as [Inventory Org]	
+		
+		,if(alt(len(Trim([Location])),0)>0,[Location],'Ringers') as [Orginal Invoice]			
+		,if(alt(len(Trim([Location])),0)>0,[Location],'Ringers') as [Inventory Org]
+		
+		,0 as [Order Number]
+		,0 as [Address Number]
+		
+		,'JAM '& MonthName([Date]) 		as [Invoice Number]	
+		,'INV' 							as [Doc Type]
+		,'PR' 							as [U/M]
+		
+		,Num([Date]) 					as [Ship Date]
+		,Num([Date]) 					as [Invoice Date]
+		,Num([Date])		 			as [Promised Delivery Date]
+		,Num([Date]) 					as [Date]
+		,Text(Date([Date],'YYYY')) 		as [MonthStoreFlag]
+		
+		,[Quantity] 					as [Sales Quantity]
+		,Alt(Num#([Quantity]),0) 		as [Sales Qty]
+		
+		,[Total Revenue] 				as [GROSS Sales Amount   LC]
+		,Alt(NUM#([Total Revenue]),0) 	as [GROSS Sales Amount LC]
+
+		,0 								as [Returns LC]
+
+		,[Total Cost] 										as [Sales Cost Amount LC (net see thru).src]
+		,Alt(Num#([Total Cost]),0) 							as [Sales Cost Amount LC (net see thru)]
+		,Alt(Num#([Total Cost]),0) 							as [BASE_COGS]
+
+		,[Total Cost] 										as [Sales Cost Amount Legal Entity]
+		,$(eEmptyCheck(Num#([Total Cost]),0))				as [COST_LE]
+
+		,0 													as [Settlement Discount LC]
+		
+		,[Total Revenue]									as [Trxn Sales Amount.src]
+		,Alt(NUM#([Total Revenue]),0) 						as [Trxn Sales Amount]
+		
+		,[Total Cost] 										as [Trxn COGS Amount.src]
+		,Alt(NUM#([Total Cost]),0) 							as [Trxn COGS Amount]
+
+		,'Standard' as [Trans Type]
+
+		,0 as [Co-op Rebate LC]
+		,0 as [Rebates LC]
+		,0 as [Volume Discount LC]
+		,0 as [BOGO]
+		,0 as [Slotting]
+		,0 as [TPR]	
+		,0 as [Other]
+		,0 as [COGS Adj 1 LC]
+		,0 as [COGS Adj 2 LC]
+		,0 as [Type of Discount #]
+		,0 as [Type of Discount Name]
+
+		,0 as [Offer #]
+		
+		,'Sales' as [Flag]
+		
+		,Null() as [PO Number]
+		
+		,[Ultimate Destination (New): Ansell Region] as [Region]
+		,[Ultimate Destination (New): Ansell SubRegion] as [Sub-region]
+		,[Ultimate Destination (New)] as [Country]
+		,[Address: Shipping Address State] as [State]
+		,[Ship To Zip Code] as [PostalCode]
+		,[Address: Shipping Address City] as [City] 
+		 
+		 
+
+      	,if(alt(WildMatch(Upper([Customer]), '*AMAZON*','*WALMART*','*ISN*'),0)>0,'e-commerce'
+	        ,if(alt(WildMatch([Sub ID],'3','4','8'),0)>0
+	      		,if(upper([Ultimate Destination (New): Ansell Region]) like 'NA'
+	      			,if(Upper([Item: Board Class]) like '*PRIVATE LABEL*','Private Label',if(Upper([Source]) like '*WEB (RINGERS GLOVES)*','Ringers: e-commerce','NAM Industrial'))
+	      		,'International')
+	      	,if(alt(WildMatch([Sub ID],'11'),0)>0
+	      		,if(alt(WildMatch(upper([Source]),'*WEB (VALEO SAFETY)*','*WEB (VALEO FITNESS)*'),0)>0,'Valeo: e-commerce',if(Upper(CID) like 'VF-*','Valeo: Retail fitness',if(Upper(CID) like 'V-*','Valeo: Industrial Safety',null())))
+	      		,null())) 
+	      		
+	   )   		
+       
+       as [Customer Roll Up]
+
+		;
+	
+SET pFileSpec = ooxml, embedded labels, header is 6 lines, table is JAMSalesbyCustomerbyGlove;
+SET pCondition = ([Date] >= $(pStartDate) or alt(ApplyMap('mHReload',upper(FilePath()),0),0)=1) and alt(len(Date),0)>0
+				and (not (
+						((alt(len(trim([Item: Parent Item (Size & Color Grouped)])),0)=0) and (alt(len(trim([Item: Board Class])),0)=0))
+						or ((alt(len(trim([Ultimate Destination (New): Ansell Region])),0)=0) and (alt(len(trim([Ultimate Destination (New): Ansell SubRegion])),0)=0))
+				))
+				
+				and 
+				
+				(
+				(alt(WildMatch(upper([CID]),'96000:*'),0)=0)
+				or
+				 (Num([Date])<num(makedate(2019,9,1)))   
+				  )
+				  
+				 and (alt(WildMatch([CID],'x-*'),0)=0)
+				
+				;
+		
+		
+SET pFileCheck = if(
+ monthstart(addmonths(date(date#(left(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),3)&Right(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),2),'MMMYY')),if(month(date(date#(left(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),3)&Right(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),2),'MMMYY')))>6,-12,0)))>=makedate(2021,5,1)
+ ,date(monthstart(addmonths(date(date#(left(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),3)&Right(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),2),'MMMYY')),if(month(date(date#(left(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),3)&Right(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),2),'MMMYY')))>6,-12,0))),'YYYYMMDD')
+  &'-'&date(monthend(addmonths(date(date#(left(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),3)&Right(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),2),'MMMYY')),if(month(date(date#(left(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),3)&Right(subfield(trim(right(upper('$1'),len('$1')-index(Upper('$1'),' ',-2))),'.',1),2),'MMMYY')))>6,-12,0))),'YYYYMMDD')
+ ,'00000000-00000000');
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition,pFileCheck,pStartDate);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+LET pCondition 	= Null(); 
+LET pFileCheck 	= Null();
+
+IF not IsNull(TableNumber('Ringers_Sales2')) then
+
+
+	Left Join ([Ringers_Sales2])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC]
+		Resident [Ringers_Sales2]
+		Where 
+			(not [Trxn COGS Amount.src] 					= [Trxn COGS Amount]) or 
+			(not [Trxn Sales Amount.src] 					= [Trxn Sales Amount]) or
+			(not [GROSS Sales Amount   LC]        			= [GROSS Sales Amount LC]) or
+			(not [Sales Cost Amount LC (net see thru).src]	= [Sales Cost Amount LC (net see thru)]) or
+			(not [Sales Cost Amount Legal Entity]        	= [COST_LE]) or
+			(not [Sales Quantity]        					= [Sales Qty])
+			
+			;
+
+	IF FieldValueCount('QC') > 0 then
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('Ringers_Sales2',cWARNING,vMessage,'GROSS Sales Amount   LC'	,'GROSS Sales Amount LC'	,vWhere);
+		CALL LogMessage('Ringers_Sales2',cWARNING,vMessage,'Sales Cost Amount LC (net see thru).src','Sales Cost Amount LC (net see thru)'		,vWhere);
+		CALL LogMessage('Ringers_Sales2',cWARNING,vMessage,'Sales Cost Amount Legal Entity','COST_LE'			,vWhere);
+		CALL LogMessage('Ringers_Sales2',cWARNING,vMessage,'Sales Quantity'			,'Sales Qty'				,vWhere);
+		CALL LogMessage('Ringers_Sales2',cWARNING,vMessage,'Trxn Sales Amount.src'			,'Trxn Sales Amount'				,vWhere);
+		CALL LogMessage('Ringers_Sales2',cWARNING,vMessage,'Trxn COGS Amount.src'			,'Trxn COGS Amount'				,vWhere);
+		LET vWhere = Null();
+	ENDIF
+	
+	
+	DROP Field [QC] From [Ringers_Sales2];
+
+	SET pFieldList = [FN]
+			,[RN]
+			,[Trxn Currency]
+			,[COGS Trxn Currency]
+			,[FinalCurrency]
+			,[COGS_FinalCurrency]
+			,[LocalCurrency]
+			,[Currency]
+			,[CompoundKey]
+			,[Entity]
+			,[Customer Number]
+			,[Product Number]
+			,[ShipToDeliveryLocationID]
+			,[CustomerShipToAddressID]
+			,[Orginal Invoice]
+			,[Inventory Org]
+			,[Order Number]
+			,[Address Number]
+			,[Invoice Number]
+			,[Doc Type]
+			,[U/M]
+			,[Ship Date]
+			,[Invoice Date]
+			,[Promised Delivery Date]
+			,[Date]
+			,[Sales Qty]
+			,[GROSS Sales Amount LC]
+			,[Returns LC]
+			,[Sales Cost Amount LC (net see thru)]
+			,[Trxn Sales Amount]
+			,[Trxn COGS Amount]
+			,[BASE_COGS]
+			,[COST_LE]
+			,[Settlement Discount LC]
+			,[Trans Type]
+			,[Co-op Rebate LC]
+			,[Rebates LC]
+			,[Volume Discount LC]
+			,[BOGO]
+			,[Slotting]
+			,[TPR]
+			,[Other]
+			,[COGS Adj 1 LC]
+			,[COGS Adj 2 LC]
+			,[Type of Discount #]
+			,[Type of Discount Name]
+			,[Offer #]
+			,[Flag]
+			,[Region]
+			,[Sub-region]
+			,[Country]
+			,[State]
+			,[PostalCode]
+			,[City]
+			,[Customer Roll Up]
+			,[PO Number]
+			;
+			
+	IF not IsNull(TableNumber('Ringers_Sales')) then
+	
+		Concatenate (Ringers_Sales2)
+		LOAD *
+		Resident Ringers_Sales;
+		CALL DropTable('Ringers_Sales');
+	
+	ENDIF;
+	
+	SET p_StartDate =  or Num(Date) < $(pStartDate);
+	CALL StoreIncremental('Ringers_Sales2',pFieldList,'MonthStoreFlag','Sales_Ringers',p_StartDate);
+	LET pFieldList = Null();
+	CALL LogMessage('Ringers_Sales2',cSUCCESSFUL);
+
+	CALL DropTable('Ringers_Sales2');
+
+ENDIF;
+
+///$tab Ringers Adj
+SET pTable = Ringers_Sales;
+SET pMask = Transaction\Ringers\Ringers Adj\Sales*.xlsx;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,'USD' as [Trxn Currency]
+		,'USD' as [COGS Trxn Currency]
+		,'USD' as [FinalCurrency]
+		,'USD' as [COGS_FinalCurrency]
+		,'USD' as [LocalCurrency]
+		,'USD' as [Currency]
+		
+		,'USD'&'-'&Text(Date([Date],'YYMM')) as [CompoundKey]
+		
+		,Text([Sub ID])	as [Entity]
+		
+		//,Text(pick(alt(WildMatch(upper([Source]),'WEB (RINGERS GLOVES)','WEB (VALEO SAFETY)','WEB (VALEO FITNESS)'),0)+1,if([CID] like 'R-*',[CID],'R-'&[CID]),1,2,3)) as [Customer Number]
+		
+		,Text(pick(alt(WildMatch(upper([Source]),'WEB (RINGERS GLOVES)','WEB (VALEO SAFETY)','WEB (VALEO FITNESS)'),0)+1,[CID],1,2,3)) as [Customer Number]
+		
+		,Text(trim([Item])) 			as [Product Number]
+			
+		,0 as [ShipToDeliveryLocationID]  
+		,0 as [CustomerShipToAddressID]  
+		
+		,'Ringers' 						as [Orginal Invoice]	
+		,'Ringers' 						as [Inventory Org]	
+		
+		,0 as [Order Number]
+		,0 as [Address Number]
+		
+		,'JAM '& MonthName([Date]) 		as [Invoice Number]	
+		,'INV' 							as [Doc Type]
+		,'PR' 							as [U/M]
+		
+		,Num([Date]) 					as [Ship Date]
+		,Num([Date]) 					as [Invoice Date]
+		,Num([Date])		 			as [Promised Delivery Date]
+		,Num([Date]) 					as [Date]
+		,Text(Date([Date],'YYYY')) 		as [MonthStoreFlag]
+		
+		,-1*[Quantity] 						as [Sales Quantity]
+		,-1*Alt(Num#([Quantity]),0) 		as [Sales Qty]
+		
+		,-1*[Total Revenue] 				as [GROSS Sales Amount   LC]
+		,-1*Alt(NUM#([Total Revenue]),0) 	as [GROSS Sales Amount LC]
+
+		,0 									as [Returns LC]
+
+		,-1*[Total Cost] 										as [Sales Cost Amount LC (net see thru).src]
+		,-1*Alt(Num#([Total Cost]),0) 							as [Sales Cost Amount LC (net see thru)]
+		,-1*Alt(Num#([Total Cost]),0) 							as [BASE_COGS]
+
+		,-1*[Total Cost] 										as [Sales Cost Amount Legal Entity]
+		,-1*$(eEmptyCheck(Num#([Total Cost]),0))				as [COST_LE]
+
+		,0 														as [Settlement Discount LC]
+		
+		,-1*[Total Revenue]										as [Trxn Sales Amount.src]
+		,-1*Alt(NUM#([Total Revenue]),0) 						as [Trxn Sales Amount]
+		
+		,-1*[Total Cost] 										as [Trxn COGS Amount.src]
+		,-1*Alt(NUM#([Total Cost]),0) 							as [Trxn COGS Amount]
+
+		,'Standard' as [Trans Type]
+
+		,0 as [Co-op Rebate LC]
+		,0 as [Rebates LC]
+		,0 as [Volume Discount LC]
+		,0 as [BOGO]
+		,0 as [Slotting]
+		,0 as [TPR]	
+		,0 as [Other]
+		,0 as [COGS Adj 1 LC]
+		,0 as [COGS Adj 2 LC]
+		,0 as [Type of Discount #]
+		,0 as [Type of Discount Name]
+
+		,0 as [Offer #]
+		
+		,'Sales' as [Flag]
+		,Null() as [PO Number]
+		,Null() as [PostalCode]
+		,Null() as [City]
+		
+		,if(alt(WildMatch([Ultimate Destination (New): Ansell Region],$(vRegionList)),0)=0,'OTHERS REGION',[Ultimate Destination (New): Ansell Region]) as [Region]
+		
+		,[Ultimate Destination (New): Ansell SubRegion] as [Sub-region]
+		,[Ultimate Destination (New)] as [Country]
+		,[Address: Shipping Address State] as [State]
+	
+    
+       
+      ,if(alt(WildMatch(Upper([Customer]), '*AMAZON*','*WALMART*','*ISN*'),0)>0,'e-commerce'
+	        ,if(alt(WildMatch([Sub ID],'3','4','8'),0)>0
+	      		,if(upper([Ultimate Destination (New): Ansell Region]) like 'NA'
+	      			,if(Upper([Item: Board Class]) like '*PRIVATE LABEL*','Private Label',if(Upper([Source]) like '*WEB (RINGERS GLOVES)*','Ringers: e-commerce','NAM Industrial'))
+	      		,'International')
+	      	,if(alt(WildMatch([Sub ID],'11'),0)>0
+	      		,if(alt(WildMatch(upper([Source]),'*WEB (VALEO SAFETY)*','*WEB (VALEO FITNESS)*'),0)>0,'Valeo: e-commerce',if(Upper(CID) like 'VF-*','Valeo: Retail fitness',if(Upper(CID) like 'V-*','Valeo: Industrial Safety',null())))
+	      		,null())) 
+	      		
+	   )   		
+       
+       as [Customer Roll Up]
+      
+		;
+SET pFileSpec = ooxml, embedded labels, header is 6 lines, table is Sheet1;
+SET pCondition = ([Date] >= $(pStartDate) or alt(ApplyMap('mHReload',upper(FilePath()),0),0)=1) and alt(len(Date),0)>0
+				//and not ((alt(len(trim([Item: Parent Item (Size & Color Grouped)])),0)=0) and (alt(len(trim([Item: Board Class])),0)=0))
+				;
+	
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition,pFileCheck,pStartDate);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+LET pCondition 	= Null(); 
+LET pFileCheck 	= Null();
+
+IF not IsNull(TableNumber('Ringers_Sales')) then
+
+
+	Left Join ([Ringers_Sales])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC]
+		Resident [Ringers_Sales]
+		Where 
+			(not [Trxn COGS Amount.src] 					= [Trxn COGS Amount]) or 
+			(not [Trxn Sales Amount.src] 					= [Trxn Sales Amount]) or
+			(not [GROSS Sales Amount   LC]        			= [GROSS Sales Amount LC]) or
+			(not [Sales Cost Amount LC (net see thru).src]	= [Sales Cost Amount LC (net see thru)]) or
+			(not [Sales Cost Amount Legal Entity]        	= [COST_LE]) or
+			(not [Sales Quantity]        					= [Sales Qty])
+			
+			;
+
+	IF FieldValueCount('QC') > 0 then
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('Ringers_Sales',cWARNING,vMessage,'GROSS Sales Amount   LC'	,'GROSS Sales Amount LC'	,vWhere);
+		CALL LogMessage('Ringers_Sales',cWARNING,vMessage,'Sales Cost Amount LC (net see thru).src','Sales Cost Amount LC (net see thru)'		,vWhere);
+		CALL LogMessage('Ringers_Sales',cWARNING,vMessage,'Sales Cost Amount Legal Entity','COST_LE'			,vWhere);
+		CALL LogMessage('Ringers_Sales',cWARNING,vMessage,'Sales Quantity'			,'Sales Qty'				,vWhere);
+		CALL LogMessage('Ringers_Sales',cWARNING,vMessage,'Trxn Sales Amount.src'			,'Trxn Sales Amount'				,vWhere);
+		CALL LogMessage('Ringers_Sales',cWARNING,vMessage,'Trxn COGS Amount.src'			,'Trxn COGS Amount'				,vWhere);
+		LET vWhere = Null();
+	ENDIF
+	
+	
+	DROP Field [QC] From [Ringers_Sales];
+
+	SET pFieldList = [FN]
+			,[RN]
+			,[Trxn Currency]
+			,[COGS Trxn Currency]
+			,[FinalCurrency]
+			,[COGS_FinalCurrency]
+			,[LocalCurrency]
+			,[Currency]
+			,[CompoundKey]
+			,[Entity]
+			,[Customer Number]
+			,[Product Number]
+			,[ShipToDeliveryLocationID]
+			,[CustomerShipToAddressID]
+			,[Orginal Invoice]
+			,[Inventory Org]
+			,[Order Number]
+			,[Address Number]
+			,[Invoice Number]
+			,[Doc Type]
+			,[U/M]
+			,[Ship Date]
+			,[Invoice Date]
+			,[Promised Delivery Date]
+			,[Date]
+			,[Sales Qty]
+			,[GROSS Sales Amount LC]
+			,[Returns LC]
+			,[Sales Cost Amount LC (net see thru)]
+			,[Trxn Sales Amount]
+			,[Trxn COGS Amount]
+			,[BASE_COGS]
+			,[COST_LE]
+			,[Settlement Discount LC]
+			,[Trans Type]
+			,[Co-op Rebate LC]
+			,[Rebates LC]
+			,[Volume Discount LC]
+			,[BOGO]
+			,[Slotting]
+			,[TPR]
+			,[Other]
+			,[COGS Adj 1 LC]
+			,[COGS Adj 2 LC]
+			,[Type of Discount #]
+			,[Type of Discount Name]
+			,[Offer #]
+			,[Flag]
+			,[Region]
+			,[Sub-region]
+			,[Country]
+			,[PostalCode]
+			,[City]
+			,[State]
+			,[Customer Roll Up]
+			,[PO Number]
+			;
+	
+	SET p_StartDate =  or Num(Date) < $(pStartDate);
+	CALL StoreIncremental('Ringers_Sales',pFieldList,'MonthStoreFlag','Sales_Ringers',p_StartDate);
+	LET pFieldList = Null();
+	CALL LogMessage('Ringers_Sales',cSUCCESSFUL);
+
+	CALL DropTable('Ringers_Sales');
+
+ENDIF;
+///$tab Ringers Budget
+LET tSrcPath = vSrcPath;
+LET vSrcPath = '';
+
+SET pTable = Ringers_Budget;
+//SET pMask = Ringers\Budget\Budget*.xlsx;	
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,'USD' 																																as [CURRENCY]
+		//,Text(pick(alt(WildMatch(upper([Source]),'WEB (RINGERS GLOVES)','WEB (VALEO SAFETY)','WEB (VALEO FITNESS)'),0)+1,[CID],1,2,3)) 	as [CUSTOMER CODE]
+		,Null() 																															as [CUSTOMER CODE]
+		,Text(trim([Item: Parent Item (Size & Color Grouped)])) 																			as [PRODUCT NUMBER]	
+		//,Null()																															as [PRODUCT NUMBER]	
+		,0 																																	as [ShipToDeliveryLocationID]  
+		,Num([Date]) 																														as [BudgetDate]
+		
+		
+		,[Quantity] 																														as [Budget Quantity]
+		,Alt(Num#([Quantity]),0) 																											as [Budget_Volume]
+		
+		,[Total Revenue] 																													as [Budget Sales]
+		,Alt(NUM#([Total Revenue]),0) 																										as [Budget_Sales]
+
+
+		,[Total Cost] 																														as [Budget COGS]
+		,Alt(Num#([Total Cost]),0) 																											as [Budget_COGS]
+			
+		,[Ultimate Destination (New): Ansell Region] 																						as [Region]
+		,[Ultimate Destination (New): Ansell SubRegion] 																					as [Sub-region]
+		,[Address: Shipping Address Country Name]																							as [Country]
+		//,[Address: Shipping Address State] 																								as [State]
+		,Null() 																															as [State]
+ 
+      	,[Name] 																															as [Customer Roll Up]
+      	,[Customer] 																														as [SBU]
+      	
+      	//,pick(alt(wildmatch(Upper([Customer]),'MECH','CHEM'),0)+1,'OTHER SBU','MECH-RING','CHEM-RING') 									as [Product Division]
+      	,if(upper([Name]) like '*VALEO*',pick(alt(wildmatch(Upper([Customer]),'MECH','CHEM'),0)+1,'OTHER SBU','MECH-VALEO','CHEM-VALEO'), pick(alt(wildmatch(Upper([Customer]),'MECH','CHEM'),0)+1,'OTHER IND-RING','MECH-RING','CHEM-RING') )										as [Product Division]
+      	,'SUI'																																as [Business Division]
+      	,'INDUSTRIAL'																														as [Customer Division]
+      	
+      	,'IND'																																as [GBU]
+       
+		;
+SET pFileSpec = ooxml, embedded labels, header is 6 lines, table is Sheet1;
+SET pCondition = alt(len(Date),0)>0;	
+
+SET p_CALL = CALL MaskLoad(pTable, vPD_Dir&'\Budget*.xlsx', pLoad, pFileSpec, pCondition,pFileCheck,pStartDate);
+CALL ParseDir('$(tSrcPath)Master\Budget Ringers\Budget*',False(),p_CALL);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+LET pCondition 	= Null(); 
+LET pFileCheck 	= Null();
+LET p_CALL 		= NULL();
+
+
+IF not IsNull(TableNumber('Ringers_Budget')) THEN
+
+	Left Join ([Ringers_Budget])
+			LOAD Distinct
+				[RN]
+				,[FN]
+				,1 as [QC]
+			Resident [Ringers_Budget]
+			Where 
+				(not [Budget Quantity] 							= [Budget_Volume]) or 
+				(not [Budget Sales] 							= [Budget_Sales]) or
+				(not [Budget COGS]        						= [Budget_COGS]) 
+				;
+	
+		IF FieldValueCount('QC') > 0 then
+			SET vWhere = and QC <> 0;
+			CALL LogMessage('Ringers_Budget',cWARNING,vMessage,'Budget Quantity'	,'Budget_Volume'	,vWhere);
+			CALL LogMessage('Ringers_Budget',cWARNING,vMessage,'Budget Sales','Budget_Sales'			,vWhere);
+			CALL LogMessage('Ringers_Budget',cWARNING,vMessage,'Budget COGS','Budget_COGS'				,vWhere);
+			LET vWhere = Null();
+		ENDIF
+		
+		
+		DROP Field [QC] From [Ringers_Budget];
+		
+		
+	Left Join (Ringers_Budget)
+		LOAD Distinct
+			BudgetDate
+			,Text(Date(BudgetDate,'YYYY')) as BudgetInc
+		Resident Ringers_Budget;
+		
+	
+		SET pFieldList = [FN]
+				,[RN]
+				,[CUSTOMER CODE]
+				,[ShipToDeliveryLocationID]
+				,[PRODUCT NUMBER]
+				,[CURRENCY]
+				,[BudgetDate]
+				,[Budget_COGS]
+				,[Budget_Volume]
+				,[Budget_Sales]
+				,[Region]
+				,[Sub-region]
+				,[Country]
+				,[State]
+				,[Customer Roll Up]
+				,[SBU]
+				,[Product Division]
+      			,[Business Division]
+      			,[Customer Division]
+      			
+      			,[GBU]
+				;
+		
+		SET p_StartDate =  or Num(Date) < $(pStartDate);
+		SET p_IncrementalField 	= [BudgetInc];
+		CALL StoreIncremental('Ringers_Budget',pFieldList,p_IncrementalField,'Budget_Ringers');
+		LET pFieldList = Null();
+		LET p_IncrementalField = Null();
+		CALL LogMessage('Ringers_Budget',cSUCCESSFUL);
+	
+		CALL DropTable('Ringers_Budget');
+
+ENDIF;
+///$tab Ringers Forecast
+SET pTable = Ringers_Forecast;
+//SET pMask = Ringers\Forecast\Forecast*.xlsx;
+		
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,'USD' 																																as [CURRENCY]
+		//,Text(pick(alt(WildMatch(upper([Source]),'WEB (RINGERS GLOVES)','WEB (VALEO SAFETY)','WEB (VALEO FITNESS)'),0)+1,[CID],1,2,3)) 		as [CUSTOMER CODE]
+		,Null() 																															as [CUSTOMER CODE]
+		//,Text(trim([Item])) 																												as [PRODUCT NUMBER]	
+		//,Null() 																															as [PRODUCT NUMBER]
+		,Text(trim([Item: Parent Item (Size & Color Grouped)])) 																			as [PRODUCT NUMBER]	
+		,0 																																	as [ShipToDeliveryLocationID]  
+		,Num([Date]) 																														as [ForecastDate]
+		
+		
+		,[Quantity] 																														as [Forecast Quantity]
+		,Alt(Num#([Quantity]),0) 																											as [Forecast_Volume]
+		
+		,[Total Revenue] 																													as [Forecast Sales]
+		,Alt(NUM#([Total Revenue]),0) 																										as [Forecast_Sales]
+
+
+		,[Total Cost] 																														as [Forecast COGS]
+		,Alt(Num#([Total Cost]),0) 																											as [Forecast_COGS]
+			
+		,[Ultimate Destination (New): Ansell Region] 																						as [Region]
+		,[Ultimate Destination (New): Ansell SubRegion] 																					as [Sub-region]
+		,[Ultimate Destination (New)] 																										as [Country]
+		//,[Address: Shipping Address State] 																									as [State]
+		,Null() 																															as [State]
+ 
+      	,[Name] 																															as [Customer Roll Up]
+      	,[Customer] 																														as [SBU]
+      	
+      //,pick(alt(wildmatch(Upper([Customer]),'MECH','CHEM'),0)+1,'OTHER SBU','MECH-RING','CHEM-RING') 										as [Product Division]
+      ,if(upper([Name]) like '*VALEO*',pick(alt(wildmatch(Upper([Customer]),'MECH','CHEM'),0)+1,'OTHER SBU','MECH-VALEO','CHEM-VALEO'), pick(alt(wildmatch(Upper([Customer]),'MECH','CHEM'),0)+1,'OTHER IND-RING','MECH-RING','CHEM-RING') )										as [Product Division]
+      	,'SUI'																																as [Business Division]
+      	,'INDUSTRIAL'																														as [Customer Division]
+      	
+      	,'IND'																																as [GBU]
+       
+		;
+SET pFileSpec = ooxml, embedded labels, header is 6 lines, table is Sheet1;
+SET pCondition = alt(len(Date),0)>0;		
+
+
+SET p_CALL = CALL MaskLoad(pTable, vPD_Dir&'\Forecast*.xlsx', pLoad, pFileSpec, pCondition,pFileCheck,pStartDate);
+CALL ParseDir('$(tSrcPath)Master\Forecast Ringers\Forecast*',False(),p_CALL);
+
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+LET pCondition 	= Null(); 
+LET pFileCheck 	= Null();
+LET p_CALL 		= Null(); 	
+
+
+IF not IsNull(TableNumber('Ringers_Forecast')) THEN
+
+	Left Join ([Ringers_Forecast])
+			LOAD Distinct
+				[RN]
+				,[FN]
+				,1 as [QC]
+			Resident [Ringers_Forecast]
+			Where 
+				(not [Forecast Quantity] 							= [Forecast_Volume]) or 
+				(not [Forecast Sales] 								= [Forecast_Sales]) or
+				(not [Forecast COGS]        						= [Forecast_COGS]) 
+				;
+	
+		IF FieldValueCount('QC') > 0 then
+			SET vWhere = and QC <> 0;
+			CALL LogMessage('Ringers_Forecast',cWARNING,vMessage,'Forecast Quantity'	,'Forecast_Volume'	,vWhere);
+			CALL LogMessage('Ringers_Forecast',cWARNING,vMessage,'Forecast Sales','Forecast_Sales'			,vWhere);
+			CALL LogMessage('Ringers_Forecast',cWARNING,vMessage,'Forecast COGS','Forecast_COGS'				,vWhere);
+			LET vWhere = Null();
+		ENDIF
+		
+		
+		DROP Field [QC] From [Ringers_Forecast];
+		
+		
+	Left Join (Ringers_Forecast)
+		LOAD Distinct
+			ForecastDate
+			,Text(Date(ForecastDate,'YYYY')) as ForecastInc
+		Resident Ringers_Forecast;
+		
+	
+		SET pFieldList = [FN]
+				,[RN]
+				,[CUSTOMER CODE]
+				,[ShipToDeliveryLocationID]
+				,[PRODUCT NUMBER]
+				,[CURRENCY]
+				,[ForecastDate]
+				,[Forecast_COGS]
+				,[Forecast_Volume]
+				,[Forecast_Sales]
+				,[Region]
+				,[Sub-region]
+				,[Country]
+				,[State]
+				,[Customer Roll Up]
+				,[SBU]
+				,[Product Division]
+      			,[Business Division]
+      			,[Customer Division]
+      			
+      			,[GBU]
+				;
+		
+		SET p_StartDate =  or Num(Date) < $(pStartDate);
+		SET p_IncrementalField 	= [ForecastInc];
+		CALL StoreIncremental('Ringers_Forecast',pFieldList,p_IncrementalField,'Forecast_Ringers');
+		LET pFieldList = Null();
+		LET p_IncrementalField = Null();
+		CALL LogMessage('Ringers_Forecast',cSUCCESSFUL);
+	
+		CALL DropTable('Ringers_Forecast');
+
+ENDIF;
+///$tab RingersCustomerMaster
+LET vSrcPath = tSrcPath;
+
+CustomerMasterRingers:
+NoConcatenate
+LOAD
+	RecNo() 						as [RN]
+	,'$(vSrcPath)Customer Master\Customer Master - Ringers.xlsx' 	as [FN]
+	,Text(Trim([CNumber]))			as [Customer Number]
+	,'OTHERS REGION' 				as [Region]
+	,'INDUSTRIAL' 					as [Customer Division]
+	
+	,Null() 						as [OPERATING UNIT]
+	,0 								as [INDUSTRY (IN BI)]
+	
+	,Capitalize([CName])			as [Customer Name]
+	
+	,Null() 						as [Market]
+	,'IND' 							as [Customer Industry]
+	,Null() 						as [Customer Sub-industry]
+	
+	,'NEW' 							as [Customer Flag]
+	
+	,'Distributor'      			as [Customer Type]
+	,Null() 						as [Customer Segment]
+	,Null() 						as [Customer Group]
+	
+	,Null()					 		as [Global Customer]
+	
+	
+	
+Inline
+[CNumber,CName
+1,Web (Ringers Gloves)
+2,Web (Valeo Safety)
+3,Web (Valeo Fitness)
+];
+
+
+STORE 
+		[Customer Number]
+		,[Global Customer]
+		,[Region]
+		,[Customer Division]
+		,[OPERATING UNIT]
+		,[INDUSTRY (IN BI)]
+		,[Customer Name]
+		,[Market]
+		,[Customer Industry]
+		,[Customer Sub-industry]
+		,[Customer Flag]
+		,[Customer Type]
+		,[Customer Segment]
+		,[Customer Group]
+		,[FN]
+	from [CustomerMasterRingers] 
+	into '$(vQVDPath)CustomerRingers.qvd' (qvd);
+
+
+
+CALL DropTable('CustomerMasterRingers');
+///$tab RingersCustomerSubRegion
+CustomerSubRegionRingers:
+NoConcatenate
+LOAD
+		RecNo() as [RN]
+		,'$(vSrcPath)Customer Master\Customer Master - Ringers.xlsx' as [FN]
+		,Text(Trim([CNumber])) as [Customer Number]
+		,null() as [ShipToAddressID]
+		,null() as [CustomerShipToAddressID]
+		,null() as [Ship to Name]
+		,null() as [Ship to Address]
+		,null() as [City]
+		,null() as [StateProvinceID]
+		,null() as [PostalCode]
+		,null() as [State]
+		,null() as [Country]
+		,null() as [Territory_Code]
+		,'NA-LAC' as [CustomerSubRegion Flag]
+		,'0' as [Sub-region]
+		,Null() as [EMEA Sub region]
+		,Null() as [EMEA Sub region.src]
+		,Null() as [CustomerDivision]
+Inline
+[CNumber,CName
+1,Web (Ringers Gloves)
+2,Web (Valeo Safety)
+3,Web (Valeo Fitness)
+];
+
+
+STORE 
+		[Customer Number]
+		,[ShipToAddressID]
+		,[Ship to Name]
+		,[Ship to Address]
+		,[CustomerShipToAddressID]
+		,[City]
+		,[StateProvinceID]
+		,[PostalCode]
+		,[State]
+		,[Country]
+		,[Territory_Code]
+		,[CustomerSubRegion Flag]
+		,[Sub-region]
+		,[FN]
+		,[EMEA Sub region]
+		,[CustomerDivision]
+	from [CustomerSubRegionRingers] 
+	into '$(vQVDPath)CustomerSubRegionRingers.qvd' (qvd);
+
+
+CALL DropTable('CustomerSubRegionRingers');
+///$tab Logs
+
+CALL DelLog ('$(vLOGPath)','$(vLogDocPrefixName)',$(vLogCountSaveLoad))
+
+LET vReloadTime = Timestamp(vReloadTime,'YYYYMMDDhhmmss');
+
+LOG:
+LOAD
+	RecNo() as [LOG.RN]
+	,[Module]
+	,[ReloadTime]
+	,[TABLE]
+	,[STATUS]
+	,IF(STATUS = 'WARNING','Line #'&([REC_NO])&' in field ['&[MESSAGE]&'] data was replaced from value "'&FromValue&'" to value "'&ToValue&'"
+	Source file: "'&FN&'"', MESSAGE)	as MESSAGE
+	,REC_NO
+    ,FromValue
+    ,ToValue
+	,if([STATUS] = 'WARNING ON DOUBLES'
+		,'DOUBLES'
+		,TextBetween([MESSAGE],'[',']',1)) as [FILENAME],
+	FN									as [File name]
+FROM
+[$(vLOGPath)$(vLogDocPrefixName)*$(vReloadTime).qvd]
+(qvd)
+//Where Upper([Module]) = Upper(DocumentPath())
+;
+	
+	[Log_Error]:
+	LOAD 	Module,
+			STATUS,
+			//TABLE,
+			COUNT(STATUS) as QtyWorning
+	Resident LOG
+	Where STATUS <> 'FAILURE'
+	Group BY 	Module,
+				STATUS/*,
+				TABLE*/;
+	
+	IF NoOfFields('Log_Error') then	
+		STORE Log_Error into '$(vLOGPath)$(vLogTotalPrefixName)Error_$(vReloadTime).qvd' (qvd);
+		
+		DROP Table Log_Error;
+	ENDIF	
+
+	CALL DelLog ('$(vLOGPath)','$(vLogDocPrefixName)',$(vLogCountSaveLoad))
+	
+		[Log_FAILURE]:
+		NoConcatenate LOAD 	*
+		Resident LOG
+		Where STATUS = 'FAILURE';
+	
+	IF NoOfFields('Log_FAILURE') then	
+		STORE Log_FAILURE into '$(vLOGPath)$(vLogTotalPrefixName)FAILURE_$(vReloadTime).qvd' (qvd);
+		
+		DROP Table Log_FAILURE;
+	ENDIF	
+
+	CALL DelLog ('$(vLOGPath)','$(vLogTotalPrefixName)',$(vLogCountSaveLoad))
+///$tab Mail
+CALL FailuresInTransformMessage('');
+///$tab Exit script
+EXIT SCRIPT;

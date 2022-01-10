@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>p_StartDate</Name>
+    <Content>or Num(Date) &lt; 44470</Content>
+  </Variable>
+</Variables>

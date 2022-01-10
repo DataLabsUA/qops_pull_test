@@ -1,0 +1,695 @@
+﻿<DocInternals>
+  <AlwaysLoose>
+    <bool>false</bool>
+    <bool>false</bool>
+    <bool>false</bool>
+    <bool>false</bool>
+    <bool>false</bool>
+  </AlwaysLoose>
+  <FieldSrcTables>
+    <String>6</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>7</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>8</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>9</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>10</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>11</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>12</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>13</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>14</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>15</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>16</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>17</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>18</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>19</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>20</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>21</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>22</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>23</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>24</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>25</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>26</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>27</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>28</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>29</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>30</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>31</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>32</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>33</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>34</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>35</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>36</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>37</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>38</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>39</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>40</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>41</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>42</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>43</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>44</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>45</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>46</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>47</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>48</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>49</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>50</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>51</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>52</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>53</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>54</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>55</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>56</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>57</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>58</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>59</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>60</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>61</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>62</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>63</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>64</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>65</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>66</String>
+    <String>1</String>
+    <String>Check</String>
+    <String>67</String>
+    <String>1</String>
+    <String>Check</String>
+  </FieldSrcTables>
+  <TableViewData>
+    <Pos></Pos>
+    <CtlInfo>
+      <InternalView>
+        <Tables>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>323</Left>
+              <Top>190</Top>
+              <Width>100</Width>
+              <Height>100</Height>
+            </Pos>
+            <Caption>GBU</Caption>
+          </TableViewTableWinSaveInfo>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>323</Left>
+              <Top>342</Top>
+              <Width>100</Width>
+              <Height>208</Height>
+            </Pos>
+            <Caption>Product</Caption>
+          </TableViewTableWinSaveInfo>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>1409</Left>
+              <Top>529</Top>
+              <Width>100</Width>
+              <Height>118</Height>
+            </Pos>
+            <Caption>LOG</Caption>
+          </TableViewTableWinSaveInfo>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>323</Left>
+              <Top>57</Top>
+              <Width>100</Width>
+              <Height>82</Height>
+            </Pos>
+            <Caption>$Syn 1 Table</Caption>
+          </TableViewTableWinSaveInfo>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>633</Left>
+              <Top>200</Top>
+              <Width>100</Width>
+              <Height>208</Height>
+            </Pos>
+            <Caption>Sales_Shipment</Caption>
+          </TableViewTableWinSaveInfo>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>1051</Left>
+              <Top>293</Top>
+              <Width>100</Width>
+              <Height>208</Height>
+            </Pos>
+            <Caption>Check</Caption>
+          </TableViewTableWinSaveInfo>
+        </Tables>
+        <BroomPoints></BroomPoints>
+        <ConnectionPoints></ConnectionPoints>
+        <ZoomFactor>3FF0000000000000</ZoomFactor>
+      </InternalView>
+      <SourceView></SourceView>
+    </CtlInfo>
+    <Mode>0</Mode>
+  </TableViewData>
+  <Bookmarks>
+    <Bookmark>
+      <Id>BM01</Id>
+      <Name>1243567</Name>
+      <ApplyAdditive>false</ApplyAdditive>
+      <FieldItems>
+        <BookmarkFieldItem>
+          <Def>
+            <Name>Address Number</Name>
+            <Type>PRESENT</Type>
+          </Def>
+          <Locked>false</Locked>
+          <SelectInfo>
+            <TextSearch></TextSearch>
+            <RangeLo>FE37E43C8800759C</RangeLo>
+            <RangeHi>FE37E43C8800759C</RangeHi>
+            <NumberFormat></NumberFormat>
+            <RangeInfo></RangeInfo>
+            <SoftLock>false</SoftLock>
+            <ContinuousRangeInfo></ContinuousRangeInfo>
+          </SelectInfo>
+          <Values>
+            <FieldValue>
+              <Text>160</Text>
+              <IsNumeric>false</IsNumeric>
+              <Number>7E37E43C8800759C</Number>
+            </FieldValue>
+            <FieldValue>
+              <Text>231</Text>
+              <IsNumeric>false</IsNumeric>
+              <Number>7E37E43C8800759C</Number>
+            </FieldValue>
+          </Values>
+          <ExcludedValues></ExcludedValues>
+          <AndMode>false</AndMode>
+          <OneAndOnlyOne>false</OneAndOnlyOne>
+        </BookmarkFieldItem>
+        <BookmarkFieldItem>
+          <Def>
+            <Name>Invoice Number</Name>
+            <Type>PRESENT</Type>
+          </Def>
+          <Locked>false</Locked>
+          <SelectInfo>
+            <TextSearch></TextSearch>
+            <RangeLo>FE37E43C8800759C</RangeLo>
+            <RangeHi>FE37E43C8800759C</RangeHi>
+            <NumberFormat></NumberFormat>
+            <RangeInfo></RangeInfo>
+            <SoftLock>false</SoftLock>
+            <ContinuousRangeInfo></ContinuousRangeInfo>
+          </SelectInfo>
+          <Values>
+            <FieldValue>
+              <Text>1243567</Text>
+              <IsNumeric>false</IsNumeric>
+              <Number>7E37E43C8800759C</Number>
+            </FieldValue>
+          </Values>
+          <ExcludedValues></ExcludedValues>
+          <AndMode>false</AndMode>
+          <OneAndOnlyOne>false</OneAndOnlyOne>
+        </BookmarkFieldItem>
+      </FieldItems>
+      <VariableItems></VariableItems>
+      <SheetId></SheetId>
+      <Objects></Objects>
+      <ApplyLayoutState>false</ApplyLayoutState>
+      <ShowPopupInfo>false</ShowPopupInfo>
+      <InfoText></InfoText>
+      <Owner></Owner>
+      <Groups></Groups>
+      <Show>
+        <Always>true</Always>
+        <Expression>
+          <v>=0</v>
+        </Expression>
+      </Show>
+      <ApplyInputFieldValues>false</ApplyInputFieldValues>
+      <InputFieldItems></InputFieldItems>
+      <ObjectsLayout></ObjectsLayout>
+      <IncludeSelectionState>true</IncludeSelectionState>
+      <IncludeScrollPosition>false</IncludeScrollPosition>
+      <AlternateStateData></AlternateStateData>
+      <ForAnnotations>false</ForAnnotations>
+    </Bookmark>
+  </Bookmarks>
+  <SavedByVersion>12.20.20800.0</SavedByVersion>
+  <ForceBackEndMacroExecution>false</ForceBackEndMacroExecution>
+  <FieldTags>
+    <ScriptBased>
+      <FieldTagData>
+        <Tag>$hidden</Tag>
+        <FieldNames>
+          <String>$Field</String>
+          <String>$Table</String>
+          <String>$Rows</String>
+          <String>$Fields</String>
+          <String>$FieldNo</String>
+          <String>$Info</String>
+          <String>_kSales</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$system</Tag>
+        <FieldNames>
+          <String>$Field</String>
+          <String>$Table</String>
+          <String>$Rows</String>
+          <String>$Fields</String>
+          <String>$FieldNo</String>
+          <String>$Info</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$ascii</Tag>
+        <FieldNames>
+          <String>f_pFTM_IgnoreFile</String>
+          <String>Module</String>
+          <String>TABLE</String>
+          <String>STATUS</String>
+          <String>MESSAGE</String>
+          <String>Trxn Currency</String>
+          <String>COGS Trxn Currency</String>
+          <String>ShipToDeliveryLocationID</String>
+          <String>CustomerShipToAddressID</String>
+          <String>Orginal Invoice</String>
+          <String>Inventory Org</String>
+          <String>Order Number</String>
+          <String>Address Number</String>
+          <String>Invoice Number</String>
+          <String>U/M</String>
+          <String>Trans Type</String>
+          <String>Region</String>
+          <String>SubRegion</String>
+          <String>_kSales</String>
+          <String>FN</String>
+          <String>FinalCurrency</String>
+          <String>COGS_FinalCurrency</String>
+          <String>LocalCurrency</String>
+          <String>Currency</String>
+          <String>CompoundKey</String>
+          <String>Entity</String>
+          <String>Customer Number</String>
+          <String>Product Number</String>
+          <String>Doc Type</String>
+          <String>MonthStoreFlag</String>
+          <String>Flag</String>
+          <String>SI_FN</String>
+          <String>2021</String>
+          <String>Settlement Discount LC.src</String>
+          <String>Co-op Rebate LC.rsc</String>
+          <String>COGS Adj 2 LC.src</String>
+          <String>Type of Discount #</String>
+          <String>Type of Discount Name</String>
+          <String>Offer #</String>
+          <String>File name</String>
+          <String>FILENAME</String>
+          <String>$Field</String>
+          <String>$Table</String>
+          <String>$Info</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$text</Tag>
+        <FieldNames>
+          <String>f_pFTM_IgnoreFile</String>
+          <String>Module</String>
+          <String>TABLE</String>
+          <String>STATUS</String>
+          <String>MESSAGE</String>
+          <String>Trxn Currency</String>
+          <String>COGS Trxn Currency</String>
+          <String>ShipToDeliveryLocationID</String>
+          <String>CustomerShipToAddressID</String>
+          <String>Orginal Invoice</String>
+          <String>Inventory Org</String>
+          <String>Order Number</String>
+          <String>Address Number</String>
+          <String>Invoice Number</String>
+          <String>U/M</String>
+          <String>Trans Type</String>
+          <String>Region</String>
+          <String>SubRegion</String>
+          <String>_kSales</String>
+          <String>FN</String>
+          <String>FinalCurrency</String>
+          <String>COGS_FinalCurrency</String>
+          <String>LocalCurrency</String>
+          <String>Currency</String>
+          <String>CompoundKey</String>
+          <String>Entity</String>
+          <String>Customer Number</String>
+          <String>Product Number</String>
+          <String>Doc Type</String>
+          <String>MonthStoreFlag</String>
+          <String>Flag</String>
+          <String>SI_FN</String>
+          <String>2021</String>
+          <String>Settlement Discount LC.src</String>
+          <String>Co-op Rebate LC.rsc</String>
+          <String>COGS Adj 2 LC.src</String>
+          <String>Type of Discount #</String>
+          <String>Type of Discount Name</String>
+          <String>Offer #</String>
+          <String>File name</String>
+          <String>FILENAME</String>
+          <String>$Field</String>
+          <String>$Table</String>
+          <String>$Info</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$numeric</Tag>
+        <FieldNames>
+          <String>ReloadTime</String>
+          <String>Qty</String>
+          <String>RN</String>
+          <String>Ship Date</String>
+          <String>Invoice Date</String>
+          <String>Promised Delivery Date</String>
+          <String>Date</String>
+          <String>Sales Qty</String>
+          <String>GROSS Sales Amount LC</String>
+          <String>Returns LC</String>
+          <String>Sales Cost Amount LC (net see thru)</String>
+          <String>Trxn Sales Amount</String>
+          <String>Trxn COGS Amount</String>
+          <String>BASE_COGS</String>
+          <String>COST_LE</String>
+          <String>Settlement Discount LC</String>
+          <String>Co-op Rebate LC</String>
+          <String>Rebates LC</String>
+          <String>Volume Discount LC</String>
+          <String>BOGO</String>
+          <String>Slotting</String>
+          <String>TPR</String>
+          <String>Other</String>
+          <String>COGS Adj 1 LC</String>
+          <String>COGS Adj 2 LC</String>
+          <String>Type of Discount #</String>
+          <String>Type of Discount Name</String>
+          <String>Offer #</String>
+          <String>ShipToDeliveryLocationID</String>
+          <String>Orginal Invoice</String>
+          <String>Inventory Org</String>
+          <String>Order Number</String>
+          <String>Address Number</String>
+          <String>Invoice Number</String>
+          <String>Sales Qty.src</String>
+          <String>Sales</String>
+          <String>Trxn Sales Amount.src</String>
+          <String>Settlement Discount LC.src</String>
+          <String>Co-op Rebate LC.rsc</String>
+          <String>Rebates LC.src</String>
+          <String>COGS Adj 1 LC.src</String>
+          <String>LOG.RN</String>
+          <String>QtyWorning</String>
+          <String>$Rows</String>
+          <String>$Fields</String>
+          <String>$FieldNo</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$timestamp</Tag>
+        <FieldNames>
+          <String>ReloadTime</String>
+          <String>Ship Date</String>
+          <String>Invoice Date</String>
+          <String>Promised Delivery Date</String>
+          <String>Date</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$integer</Tag>
+        <FieldNames>
+          <String>Qty</String>
+          <String>RN</String>
+          <String>Ship Date</String>
+          <String>Invoice Date</String>
+          <String>Promised Delivery Date</String>
+          <String>Date</String>
+          <String>Settlement Discount LC</String>
+          <String>Co-op Rebate LC</String>
+          <String>Volume Discount LC</String>
+          <String>BOGO</String>
+          <String>Slotting</String>
+          <String>Other</String>
+          <String>COGS Adj 2 LC</String>
+          <String>Type of Discount #</String>
+          <String>Type of Discount Name</String>
+          <String>Offer #</String>
+          <String>Sales Qty</String>
+          <String>Sales Cost Amount LC (net see thru)</String>
+          <String>Trxn COGS Amount</String>
+          <String>BASE_COGS</String>
+          <String>COST_LE</String>
+          <String>COGS Adj 1 LC</String>
+          <String>GROSS Sales Amount LC</String>
+          <String>Returns LC</String>
+          <String>Trxn Sales Amount</String>
+          <String>Rebates LC</String>
+          <String>TPR</String>
+          <String>ShipToDeliveryLocationID</String>
+          <String>Orginal Invoice</String>
+          <String>Inventory Org</String>
+          <String>Order Number</String>
+          <String>Address Number</String>
+          <String>Invoice Number</String>
+          <String>Sales Qty.src</String>
+          <String>Settlement Discount LC.src</String>
+          <String>Co-op Rebate LC.rsc</String>
+          <String>Rebates LC.src</String>
+          <String>LOG.RN</String>
+          <String>QtyWorning</String>
+          <String>$Rows</String>
+          <String>$Fields</String>
+          <String>$FieldNo</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$key</Tag>
+        <FieldNames>
+          <String>RN</String>
+          <String>FN</String>
+          <String>Trxn Currency</String>
+          <String>COGS Trxn Currency</String>
+          <String>FinalCurrency</String>
+          <String>COGS_FinalCurrency</String>
+          <String>LocalCurrency</String>
+          <String>Currency</String>
+          <String>CompoundKey</String>
+          <String>Entity</String>
+          <String>Customer Number</String>
+          <String>Product Number</String>
+          <String>ShipToDeliveryLocationID</String>
+          <String>CustomerShipToAddressID</String>
+          <String>Orginal Invoice</String>
+          <String>Inventory Org</String>
+          <String>Order Number</String>
+          <String>Address Number</String>
+          <String>Invoice Number</String>
+          <String>Doc Type</String>
+          <String>U/M</String>
+          <String>Ship Date</String>
+          <String>Invoice Date</String>
+          <String>Promised Delivery Date</String>
+          <String>Date</String>
+          <String>MonthStoreFlag</String>
+          <String>Qty</String>
+          <String>Sales Qty</String>
+          <String>GROSS Sales Amount LC</String>
+          <String>Returns LC</String>
+          <String>Sales Cost Amount LC (net see thru)</String>
+          <String>Trxn Sales Amount</String>
+          <String>Trxn COGS Amount</String>
+          <String>BASE_COGS</String>
+          <String>COST_LE</String>
+          <String>Settlement Discount LC</String>
+          <String>Trans Type</String>
+          <String>Co-op Rebate LC</String>
+          <String>Rebates LC</String>
+          <String>Volume Discount LC</String>
+          <String>BOGO</String>
+          <String>Slotting</String>
+          <String>TPR</String>
+          <String>Other</String>
+          <String>COGS Adj 1 LC</String>
+          <String>COGS Adj 2 LC</String>
+          <String>Type of Discount #</String>
+          <String>Type of Discount Name</String>
+          <String>Offer #</String>
+          <String>PO Number</String>
+          <String>Flag</String>
+          <String>Region</String>
+          <String>SubRegion</String>
+          <String>_kSales</String>
+          <String>Module</String>
+          <String>STATUS</String>
+          <String>LOG.RN</String>
+          <String>ReloadTime</String>
+          <String>TABLE</String>
+          <String>MESSAGE</String>
+          <String>REC_NO</String>
+          <String>FromValue</String>
+          <String>ToValue</String>
+          <String>FILENAME</String>
+          <String>File name</String>
+          <String>$Field</String>
+          <String>$Table</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$date</Tag>
+        <FieldNames>
+          <String>Ship Date</String>
+          <String>Invoice Date</String>
+          <String>Promised Delivery Date</String>
+          <String>Date</String>
+        </FieldNames>
+      </FieldTagData>
+    </ScriptBased>
+    <Interactive>
+      <FieldTagData>
+        <Tag>$numeric</Tag>
+        <FieldNames>
+          <String>ReloadTime</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$timestamp</Tag>
+        <FieldNames>
+          <String>ReloadTime</String>
+        </FieldNames>
+      </FieldTagData>
+    </Interactive>
+  </FieldTags>
+  <FieldComments></FieldComments>
+  <TableComments></TableComments>
+  <CreatePrjFolder>false</CreatePrjFolder>
+  <LinkedTables></LinkedTables>
+  <AppObjectEntries></AppObjectEntries>
+  <GenericDimensions></GenericDimensions>
+  <GenericMeasures></GenericMeasures>
+  <GenericBookmarks></GenericBookmarks>
+  <ConnectionInfo></ConnectionInfo>
+  <GenericDerivedDefinitions></GenericDerivedDefinitions>
+  <GenericDerivedFields></GenericDerivedFields>
+  <BnfOff>false</BnfOff>
+  <CreatedAfterSingleQuoteExactSearch>false</CreatedAfterSingleQuoteExactSearch>
+</DocInternals>

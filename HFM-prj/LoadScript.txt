@@ -1,0 +1,453 @@
+﻿///$tab License
+/*************************************************************************
+* 
+* Ansell Healthcare, LLC
+* DVSTS Ltd.
+* CONFIDENTIAL
+* __________________
+* 
+* 2016 Ansell Healthcare, LLC 
+* 2016 DVSTS Ltd. 
+* All Rights Reserved.
+* 
+* NOTICE:  All information contained herein is, and remains
+* the property of Ansell Healthcare, LLC and DVSTS Ltd. The
+* intellectual and technical concepts contained herein are
+* proprietary to Ansell Healthcare, LLC and DVSTS Ltd. and
+* may be covered by U.S. and Foreign Patents, patents in
+* process, and are protected by trade secret or copyright
+* law. Dissemination of this information or reproduction of
+* this material is strictly forbidden unless prior written
+* permission is obtained from Ansell Healthcare, LLC.
+*************************************************************************/
+ 
+///$tab Main
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='₹ #,##0.00;₹ -#,##0.00';
+SET TimeFormat='hh:mm:ss';
+SET DateFormat='MM/DD/YYYY';
+SET TimestampFormat='MM/DD/YYYY hh:mm:ss[.fff]';
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+
+LET vReloadTime = Num(Now(),'##############');
+
+$(Include=.\HFMSettings.qvs);
+
+LET vSrcPath = if(Right(vSrcPath,1) = '\',vSrcPath,vSrcPath&'\');
+LET vQVDPath = if(Right(vQVDPath,1) = '\',vQVDPath,vQVDPath&'\');
+
+$(Include=$(vINCPath)procedures.qvs);
+$(Include=$(vINCPath)\transformmailprocedures.qvs);
+
+LET pStartDate = 0;
+///$tab HFM
+SUB HFMParse(pHFMP_FileMask,pHFMP_Spec,pHFMP_Field)
+	
+	FOR Each vHFMP_File in FileList(pHFMP_FileMask)
+	
+		TRACE $(vHFMP_File);
+
+		SET ErrorMode = 0;
+
+		tHFMP_1:
+		NoConcatenate
+		LOAD 
+			FilePath() & ' $(pHFMP_Field)' as FN
+			,*
+		FROM
+		[$(vHFMP_File)]
+		($(pHFMP_Spec));
+		
+		LET vHFMP_ScriptError = ScriptError;
+		
+		IF vHFMP_ScriptError > 0 then
+	
+			SET vHFMP_Message = 'File [$(vHFMP_File)] thrown an error: $(vHFMP_ScriptError)';
+			CALL LogMessage(pHFMP_Field,cFAILURE,vHFMP_Message);
+			SET ErrorMode = 1;
+		
+		ELSE
+	
+			SET ErrorMode = 1;
+			
+			LET vHFMP_NoOfFields = NoOfFields('tHFMP_1');
+			LET vHFMP_Header = '';
+			LET vHFMP_HeaderCnt = 0;
+			LET vHFMP_Attrib = '';
+			
+			FOR vHFMP_i = 1 to vHFMP_NoOfFields
+			
+				LET vHFMP_FieldName = FieldName(vHFMP_i,'tHFMP_1');
+				
+				IF IsNull(Date(Date#(vHFMP_FieldName,'MMM YYYY'))) then
+				
+					IF not Match(vHFMP_FieldName,'Period',pHFMP_Field,'HFMDate') then
+				
+						LET vHFMP_Header = vHFMP_Header & if(Len(vHFMP_Header)>0,',','') & '[' & vHFMP_FieldName & ']';
+					
+					ELSE
+					
+						LET vHFMP_Header = vHFMP_Header & if(Len(vHFMP_Header)>0,',','') & '[' & vHFMP_FieldName & ']' & ' as ' & '[' & '_' & vHFMP_FieldName & ']';
+					
+					ENDIF;
+					
+					LET vHFMP_HeaderCnt = vHFMP_HeaderCnt + 1;
+				
+				ELSE
+			
+					LET vHFMP_Attrib = vHFMP_Attrib & ',' & '[' & vHFMP_FieldName & ']';
+				
+				ENDIF;
+			
+			NEXT vHFMP_i;
+			
+			tHFMP_2:
+			CrossTable(Period, $(pHFMP_Field)_, $(vHFMP_HeaderCnt))
+			LOAD
+				$(vHFMP_Header)
+				$(vHFMP_Attrib)
+			Resident tHFMP_1;
+	
+			CALL DropTable('tHFMP_1');
+			
+			IF IsNull(TableNumber('tHFMP_Out')) then
+	
+				tHFMP_Out:
+				NoConcatenate
+				LOAD
+					*
+					,RecNo() as RN
+					,Num(Date#(Period,'MMM YYYY')) as HFMDate
+					,Num(Alt(Num#($(pHFMP_Field)_),0)) as $(pHFMP_Field)
+				Resident tHFMP_2;
+			
+			ELSE
+			
+				Concatenate(tHFMP_Out)
+				LOAD
+					*
+					,RecNo() as RN
+					,Num(Date#(Period,'MMM YYYY')) as HFMDate
+					,Num(Alt(Num#($(pHFMP_Field)_),0)) as $(pHFMP_Field)
+				Resident tHFMP_2;
+			
+			ENDIF;
+			
+			CALL DropTable('tHFMP_2');
+		
+			SET vHFMP_Message = 'File [$(vHFMP_File)] loaded successfuly';
+			CALL LogMessage(pHFMP_Field,cSUCCESSFUL,vHFMP_Message);
+		ENDIF;
+		
+		LET vHFMP_ScriptError 	= Null();
+		LET vHFMP_NoOfFields 	= Null();
+		LET vHFMP_Header 		= Null();
+		LET vHFMP_HeaderCnt 	= Null();
+		LET vHFMP_Attrib 		= Null();
+		LET vHFMP_i 			= Null();
+		LET vHFMP_FieldName 	= Null();
+		LET vHFMP_Message 		= Null();
+		
+
+	NEXT vHFMP_File;
+
+	CALL LogMessage(pHFMP_Field,cSUCCESSFUL);
+	LET vHFMP_File = Null();
+
+ENDSUB;
+
+SET p_FileMask 	= $(vSrcPath)HFM\HFM Data *.xlsx;
+SET p_Spec 		= ooxml, embedded labels, table is [Sales];
+SET p_Field 	= HFM_Sales;
+CALL HFMParse(p_FileMask,p_Spec,p_Field);
+LET p_Spec 		= Null(); 
+LET p_Field 	= Null();
+
+DROP Field Period From tHFMP_Out;
+
+Left Join (tHFMP_Out)
+	LOAD Distinct
+		HFMDate
+		,Text(Date(HFMDate,'YYYY')) as HFMInc
+	Resident tHFMP_Out;
+
+Concatenate(tHFMP_Out)
+	LOAD
+		Null() as [RN]
+		,Null() as [FN]
+		,Null() as [GBU]
+		,Null() as [Region]
+		,Null() as [SubRegion]
+		,Null() as [Country]
+		,Null() as [Category]
+		,Null() as [HFMDate]
+		,Null() as [HFM_Sales]
+		,Null() as [HFM_FxLY]
+		,Null() as [HFM_FxB]
+		,Null() as [HFM_Budget]
+		,Null() as [HFM_Forecast]
+	AutoGenerate(0);
+	
+SET p_Table 			= tHFMP_Out;
+SET p_StoreFieldList 	= [RN],[FN],[GBU],[Region],[SubRegion],[Country],[Category],[HFMDate],[HFM_Sales],[HFM_FxLY],[HFM_FxB],[HFM_Budget],[HFM_Forecast];
+SET p_IncrementalField 	= [HFMInc];
+SET p_StoreName 		= HFM;
+SET p_StartDate 		=  or Num(HFMDate) < $(pStartDate);
+CALL StoreIncremental(p_Table,p_StoreFieldList,p_IncrementalField,p_StoreName)
+LET p_Table 			= Null();
+LET p_StoreFieldList 	= Null();
+LET p_IncrementalField 	= Null();
+LET p_StoreName 		= Null();
+LET p_StartDate 		= Null();
+
+CALL DropTable('tHFMP_Out');
+
+SET p_FileMask 	= $(vSrcPath)HFM\HFM Data *.xlsx;
+SET p_Spec 		= ooxml, embedded labels, table is [FxLY];
+SET p_Field 	= HFM_FxLY;
+CALL HFMParse(p_FileMask,p_Spec,p_Field);
+LET p_Spec 		= Null(); 
+LET p_Field 	= Null();
+
+DROP Field Period From tHFMP_Out;
+
+Left Join (tHFMP_Out)
+	LOAD Distinct
+		HFMDate
+		,Text(Date(HFMDate,'YYYY')) as HFMInc
+	Resident tHFMP_Out;
+
+Concatenate(tHFMP_Out)
+	LOAD
+		Null() as [RN]
+		,Null() as [FN]
+		,Null() as [GBU]
+		,Null() as [Region]
+		,Null() as [SubRegion]
+		,Null() as [Country]
+		,Null() as [Category]
+		,Null() as [HFMDate]
+		,Null() as [HFM_Sales]
+		,Null() as [HFM_FxLY]
+		,Null() as [HFM_FxB]
+		,Null() as [HFM_Budget]
+		,Null() as [HFM_Forecast]
+	AutoGenerate(0);
+	
+SET p_Table 			= tHFMP_Out;
+SET p_StoreFieldList 	= [RN],[FN],[GBU],[Region],[SubRegion],[Country],[Category],[HFMDate],[HFM_Sales],[HFM_FxLY],[HFM_FxB],[HFM_Budget],[HFM_Forecast];
+SET p_IncrementalField 	= [HFMInc];
+SET p_StoreName 		= HFM;
+SET p_StartDate 		=  or Num(HFMDate) < $(pStartDate);
+CALL StoreIncremental(p_Table,p_StoreFieldList,p_IncrementalField,p_StoreName)
+LET p_Table 			= Null();
+LET p_StoreFieldList 	= Null();
+LET p_IncrementalField 	= Null();
+LET p_StoreName 		= Null();
+LET p_StartDate			= Null();
+
+CALL DropTable('tHFMP_Out');
+
+SET p_FileMask 	= $(vSrcPath)HFM\HFM Data *.xlsx;
+SET p_Spec 		= ooxml, embedded labels, table is [FxBud];
+SET p_Field 	= HFM_FxB;
+CALL HFMParse(p_FileMask,p_Spec,p_Field);
+LET p_Spec 	= Null(); 
+LET p_Field = Null();
+
+DROP Field Period From tHFMP_Out;
+
+Left Join (tHFMP_Out)
+	LOAD Distinct
+		HFMDate
+		,Text(Date(HFMDate,'YYYY')) as HFMInc
+	Resident tHFMP_Out;
+
+Concatenate(tHFMP_Out)
+	LOAD
+		Null() as [RN]
+		,Null() as [FN]
+		,Null() as [GBU]
+		,Null() as [Region]
+		,Null() as [SubRegion]
+		,Null() as [Country]
+		,Null() as [Category]
+		,Null() as [HFMDate]
+		,Null() as [HFM_Sales]
+		,Null() as [HFM_FxLY]
+		,Null() as [HFM_FxB]
+		,Null() as [HFM_Budget]
+		,Null() as [HFM_Forecast]
+	AutoGenerate(0);
+	
+SET p_Table 			= tHFMP_Out;
+SET p_StoreFieldList 	= [RN],[FN],[GBU],[Region],[SubRegion],[Country],[Category],[HFMDate],[HFM_Sales],[HFM_FxLY],[HFM_FxB],[HFM_Budget],[HFM_Forecast];
+SET p_IncrementalField 	= [HFMInc];
+SET p_StoreName 		= HFM;
+SET p_StartDate 		=  or Num(HFMDate) < $(pStartDate);
+CALL StoreIncremental(p_Table,p_StoreFieldList,p_IncrementalField,p_StoreName)
+LET p_Table 			= Null();
+LET p_StoreFieldList 	= Null();
+LET p_IncrementalField 	= Null();
+LET p_StoreName 		= Null();
+LET p_StartDate			= Null();
+
+CALL DropTable('tHFMP_Out');
+
+SET p_FileMask 	= $(vSrcPath)HFM\HFM Data *.xlsx;
+SET p_Spec 		= ooxml, embedded labels, table is [Bud];
+SET p_Field 	= HFM_Budget;
+CALL HFMParse(p_FileMask,p_Spec,p_Field);
+LET p_Spec 	= Null(); 
+LET p_Field = Null();
+
+DROP Field Period From tHFMP_Out;
+
+Left Join (tHFMP_Out)
+	LOAD Distinct
+		HFMDate
+		,Text(Date(HFMDate,'YYYY')) as HFMInc
+	Resident tHFMP_Out;
+
+Concatenate(tHFMP_Out)
+	LOAD
+		Null() as [RN]
+		,Null() as [FN]
+		,Null() as [GBU]
+		,Null() as [Region]
+		,Null() as [SubRegion]
+		,Null() as [Country]
+		,Null() as [Category]
+		,Null() as [HFMDate]
+		,Null() as [HFM_Sales]
+		,Null() as [HFM_FxLY]
+		,Null() as [HFM_FxB]
+		,Null() as [HFM_Budget]
+		,Null() as [HFM_Forecast]
+	AutoGenerate(0);
+	
+SET p_Table 			= tHFMP_Out;
+SET p_StoreFieldList 	= [RN],[FN],[GBU],[Region],[SubRegion],[Country],[Category],[HFMDate],[HFM_Sales],[HFM_FxLY],[HFM_FxB],[HFM_Budget],[HFM_Forecast];
+SET p_IncrementalField 	= [HFMInc];
+SET p_StoreName 		= HFM;
+SET p_StartDate 		=  or Num(HFMDate) < $(pStartDate);
+CALL StoreIncremental(p_Table,p_StoreFieldList,p_IncrementalField,p_StoreName)
+LET p_Table 			= Null();
+LET p_StoreFieldList 	= Null();
+LET p_IncrementalField 	= Null();
+LET p_StoreName 		= Null();
+LET p_StartDate			= Null();
+
+CALL DropTable('tHFMP_Out');
+
+SET p_FileMask 	= $(vSrcPath)HFM\HFM Data *.xlsx;
+SET p_Spec 		= ooxml, embedded labels, table is [Fcast];
+SET p_Field 	= HFM_Forecast;
+CALL HFMParse(p_FileMask,p_Spec,p_Field);
+LET p_Spec 		= Null(); 
+LET p_Field 	= Null();
+
+DROP Field Period From tHFMP_Out;
+
+Left Join (tHFMP_Out)
+	LOAD Distinct
+		HFMDate
+		,Text(Date(HFMDate,'YYYY')) as HFMInc
+	Resident tHFMP_Out;
+
+Concatenate(tHFMP_Out)
+	LOAD
+		Null() as [RN]
+		,Null() as [FN]
+		,Null() as [GBU]
+		,Null() as [Region]
+		,Null() as [SubRegion]
+		,Null() as [Country]
+		,Null() as [Category]
+		,Null() as [HFMDate]
+		,Null() as [HFM_Sales]
+		,Null() as [HFM_FxLY]
+		,Null() as [HFM_FxB]
+		,Null() as [HFM_Budget]
+		,Null() as [HFM_Forecast]
+	AutoGenerate(0);
+	
+SET p_Table 			= tHFMP_Out;
+SET p_StoreFieldList 	= [RN],[FN],[GBU],[Region],[SubRegion],[Country],[Category],[HFMDate],[HFM_Sales],[HFM_FxLY],[HFM_FxB],[HFM_Budget],[HFM_Forecast];
+SET p_IncrementalField 	= [HFMInc];
+SET p_StoreName 		= HFM;
+SET p_StartDate 		=  or Num(HFMDate) < $(pStartDate);
+CALL StoreIncremental(p_Table,p_StoreFieldList,p_IncrementalField,p_StoreName)
+LET p_Table 			= Null();
+LET p_StoreFieldList 	= Null();
+LET p_IncrementalField 	= Null();
+LET p_StoreName 		= Null();
+LET p_StartDate			= Null();
+
+CALL DropTable('tHFMP_Out');
+
+///$tab Logs
+
+CALL DelLog ('$(vLOGPath)','$(vLogDocPrefixName)',$(vLogCountSaveLoad))
+
+LET vReloadTime = Timestamp(vReloadTime,'YYYYMMDDhhmmss');
+
+LOG:
+LOAD
+	RecNo() as [LOG.RN]
+	,[Module]
+	,[ReloadTime]
+	,[TABLE]
+	,[STATUS]
+	,IF(STATUS = 'WARNING','Line #'&([REC_NO])&' in field ['&[MESSAGE]&'] data was replaced from value "'&FromValue&'" to value "'&ToValue&'"
+	Source file: "'&FN&'"', MESSAGE)	as MESSAGE
+	,REC_NO
+    ,FromValue
+    ,ToValue
+	,if([STATUS] = 'WARNING ON DOUBLES'
+		,'DOUBLES'
+		,TextBetween([MESSAGE],'[',']',1)) as [FILENAME],
+	FN									as [File name]
+FROM
+[$(vLOGPath)$(vLogDocPrefixName)*$(vReloadTime).qvd]
+(qvd)
+//Where Upper([Module]) = Upper(DocumentPath())
+;
+	
+	[Log_Error]:
+	LOAD 	Module,
+			STATUS,
+			//TABLE,
+			COUNT(STATUS) as QtyWorning
+	Resident LOG
+	Where STATUS <> 'FAILURE'
+	Group BY 	Module,
+				STATUS/*,
+				TABLE*/;
+	
+	IF NoOfFields('Log_Error') then	
+		STORE Log_Error into '$(vLOGPath)$(vLogTotalPrefixName)Error_$(vReloadTime).qvd' (qvd);
+		
+		DROP Table Log_Error;
+	ENDIF	
+
+	CALL DelLog ('$(vLOGPath)','$(vLogDocPrefixName)',$(vLogCountSaveLoad))
+	
+		[Log_FAILURE]:
+		NoConcatenate LOAD 	*
+		Resident LOG
+		Where STATUS = 'FAILURE';
+	
+	IF NoOfFields('Log_FAILURE') then	
+		STORE Log_FAILURE into '$(vLOGPath)$(vLogTotalPrefixName)FAILURE_$(vReloadTime).qvd' (qvd);
+		
+		DROP Table Log_FAILURE;
+	ENDIF	
+
+	CALL DelLog ('$(vLOGPath)','$(vLogTotalPrefixName)',$(vLogCountSaveLoad))
+///$tab Mail
+CALL FailuresInTransformMessage('');

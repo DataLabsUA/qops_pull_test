@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vRegionList</Name>
+    <Content>'NA','EMEA', 'APAC' ,'Central','LAC','Microgard'</Content>
+  </Variable>
+</Variables>

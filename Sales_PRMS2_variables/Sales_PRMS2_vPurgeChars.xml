@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vPurgeChars</Name>
+    <Content>Chr(9)&amp;Chr(10)&amp;Chr(13)&amp;Chr(32)&amp;Chr(160)&amp;Chr(12288)&amp;'-'</Content>
+  </Variable>
+</Variables>

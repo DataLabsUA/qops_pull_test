@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>pFCError</Name>
+    <Content>Expected to have "PAM_REBATES_[YYYYMM].QVD"</Content>
+  </Variable>
+</Variables>

@@ -1,0 +1,3286 @@
+﻿///$tab License
+/*************************************************************************
+* 
+* Ansell Healthcare, LLC
+* DVSTS Ltd.
+* CONFIDENTIAL
+* __________________
+* 
+* 2016 Ansell Healthcare, LLC 
+* 2016 DVSTS Ltd. 
+* All Rights Reserved.
+* 
+* NOTICE:  All information contained herein is, and remains
+* the property of Ansell Healthcare, LLC and DVSTS Ltd. The
+* intellectual and technical concepts contained herein are
+* proprietary to Ansell Healthcare, LLC and DVSTS Ltd. and
+* may be covered by U.S. and Foreign Patents, patents in
+* process, and are protected by trade secret or copyright
+* law. Dissemination of this information or reproduction of
+* this material is strictly forbidden unless prior written
+* permission is obtained from Ansell Healthcare, LLC.
+*************************************************************************/
+ 
+///$tab Main
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='₹ #,##0.00;₹ -#,##0.00';
+SET TimeFormat='hh:mm:ss';
+SET DateFormat='MM/DD/YYYY';
+SET TimestampFormat='MM/DD/YYYY hh:mm:ss[.fff]';
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+
+LET vReloadTime = Num(Now(),'##############');
+
+$(Include=.\masterssettings.qvs);
+
+LET vSrcPath = if(Right(vSrcPath,1) = '\',vSrcPath,vSrcPath&'\');
+LET vQVDPath = if(Right(vQVDPath,1) = '\',vQVDPath,vQVDPath&'\');
+
+$(Include=$(vINCPath)procedures.qvs);
+$(Include=$(vINCPath)\transformmailprocedures.qvs);
+
+SET vPurgeChars = Chr(9)&Chr(10)&Chr(13)&Chr(32)&Chr(160)&Chr(12288)&'-';
+SET vRegionList = 'NA','EMEA', 'APAC' ,'Central','LAC','Microgard';
+///$tab Copy PBCS
+Execute cmd.exe /C "\\ansqlik4\QlikviewAuto\Ansell GIS 2.0\_INCLUDES\Copy_PBCS_to_ansqlik4.bat";
+///$tab OriginMaster
+SET pTable 		= MASTER_OriginMaster;
+SET pMask 		= Master\Origin Master*.xlsx;
+SET pLoad 		= RecNo() as [RN]
+		,FilePath() as [FN]
+		,if(
+			Alt(Len(Purgechar([Origin],$(vPurgeChars))),0)=0
+			,'0'
+			,Text([Origin])) as [Origin]
+		,Text([Origin]) as [Origin.src]
+		,[Origin Name]
+		,[Origin type] as [Origin Type]
+		,[Country] as [Origin Country];
+SET pFileSpec 	= ooxml, embedded labels, table is Origin;
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+IF not IsNull(TableNumber('MASTER_OriginMaster')) then
+
+	LET vFile = Null();
+	
+	STORE 
+		[Origin]
+		,[Origin Name]
+		,[Origin Type]
+		,[Origin Country] 
+		,[FN]
+	from [MASTER_OriginMaster] 
+	into '$(vQVDPath)OriginMaster.qvd' (qvd);
+	
+	Left Join ([MASTER_OriginMaster])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC]
+		Resident [MASTER_OriginMaster]
+		Where not ([Origin] = [Origin.src]);
+	
+	IF FieldValueCount('QC') > 0 then
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('MASTER_OriginMaster',cWARNING,vMessage,'Origin.src','Origin',vWhere);
+	ENDIF
+	
+	
+	/*
+	IF FieldValueCount('QC') > 0 then
+	
+		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has Origin "'&[Origin.src]&'". Replaced with "'&[Origin]&'"';
+		CALL LogMessage('OriginMaster',cWARNING,vMessage);
+	
+	ENDIF;
+	*/	
+	CALL LogMessage('MASTER_OriginMaster',cSUCCESSFUL);
+	
+	CALL DropTable('MASTER_OriginMaster');
+
+ENDIF;
+
+LET vMessage = Null();
+///$tab Entity
+SET pTable 	= MASTER_Entity;
+SET pMask 	= Master\Legal entity master.xlsx;
+SET pLoad 	= RecNo() as [RN]
+		,FilePath() as [FN]
+		,if(
+			Alt(Len(Purgechar([Company Number Detail],$(vPurgeChars))),0)=0
+			,'0'
+			,Text([Company Number Detail])) as [Entity]
+		,Text([Company Number Detail]) as [Entity.src]
+		,if(
+			Alt(Len(Purgechar([Legal Entity],$(vPurgeChars))),0)=0
+			,'0'
+			,Text([Legal Entity])) as [Legal Entity]
+		,Text([Legal Entity]) as [Legal Entity.src];
+SET pFileSpec = ooxml, embedded labels, table is [Legal Entity];
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+IF not IsNull(TableNumber('MASTER_Entity')) then
+	
+	LET vFile = Null();
+	
+	STORE 
+		[Entity]
+		,[Entity] as [Entity1]
+		,[Legal Entity] 
+		,[FN]
+	from [MASTER_Entity] 
+	into '$(vQVDPath)Entity.qvd' (qvd);
+	
+	Inner Join ([MASTER_Entity])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC]
+		Resident [MASTER_Entity]
+		Where not ([Entity] = [Entity.src]) or not ([Legal Entity] = [Legal Entity.src]);
+	
+	IF FieldValueCount('QC') > 0 then
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('MASTER_Entity',cWARNING,vMessage,'Entity.src'			,'Entity'		,vWhere);
+		CALL LogMessage('MASTER_Entity',cWARNING,vMessage,'Legal Entity.src'	,'Legal Entity'	,vWhere);
+	ENDIF
+
+	/*
+	IF FieldValueCount('QC') > 0 then
+	
+		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has '
+			&replace(
+				replace(
+					';;'
+					&if(not ([Entity] = [Entity.src]),';[Company Number Detail] "'&[Entity.src]&'". Replaced with "'&[Entity]&'";','')
+					&if(not ([Legal Entity] = [Legal Entity.src]),';[Legal Entity] "'&[Legal Entity.src]&'". Replaced with "'&[Legal Entity]&'";','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,';')
+			;
+		CALL LogMessage('Entity',cWARNING,vMessage);
+	
+	ENDIF;
+	*/
+	CALL LogMessage('MASTER_Entity',cSUCCESSFUL);
+	
+	CALL DropTable('MASTER_Entity');
+
+ENDIF;
+
+LET vMessage = Null();
+///$tab GBU
+SET pTable 	= MASTER_GBU;
+SET pMask 	= Master\Product Division - GBU*.xlsx;
+SET pLoad 	= RecNo() as [RN]
+		,FilePath() as [FN]
+		,Text([Product Division]) as [Product Division]
+		,if(not match ([GBU],'BP','HSS','IND','MED','SU','SW'),'OTHERS GBU',Text([GBU])) as [GBU]
+		,Text([GBU]) as [GBU.src];
+SET pFileSpec = ooxml, embedded labels, table is [Product Division];
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+IF not IsNull(TableNumber('MASTER_GBU')) then
+
+	LET vFile = Null();
+	
+	STORE 
+		[Product Division]
+		,[GBU] 
+		,[FN]
+	from [MASTER_GBU] 
+	into '$(vQVDPath)GBU.qvd' (qvd);
+	
+	Left Join ([MASTER_GBU])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC]
+		Resident [MASTER_GBU]
+		Where not ([GBU] = [GBU.src]);
+	
+	IF FieldValueCount('QC') > 0 then
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('MASTER_GBU',cWARNING,vMessage,'GBU.src'			,'GBU'		,vWhere);
+	
+	ENDIF
+	
+	/*
+	IF FieldValueCount('QC') > 0 then
+	
+		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has [Origin] "'&[GBU.src]&'". Replaced with "'&[GBU]&'"';
+		CALL LogMessage('GBU',cWARNING,vMessage);
+	
+	ENDIF;
+	*/	
+	CALL LogMessage('MASTER_GBU',cSUCCESSFUL);
+	
+	DROP Fields [RN], [FN], [GBU.src], [QC] From [MASTER_GBU];
+
+ENDIF;
+
+LET vMessage = Null();
+///$tab MDM Filter
+SET pTable = MDM Filter;
+SET pMask = MDM Filter.xlsx;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		,Text([Source]) as [Source]
+		,[MDM STATUS];
+SET pFileSpec = ooxml, embedded labels, table is MDM;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+IF not IsNull(TableNumber('MDM Filter')) then
+
+	LET vFile = Null();
+	
+	STORE 
+		[Source]
+		,[MDM STATUS] 
+		,[FN]
+	from [MDM Filter] 
+	into '$(vQVDPath)MDM Filter.qvd' (qvd);
+	
+	CALL LogMessage('MASTER_MDM Filter',cSUCCESSFUL);
+	
+	DROP Fields [RN], [FN] From [MDM Filter];
+
+ENDIF;
+
+LET vMessage = Null();
+///$tab Product SBU
+SET pTable = MASTER_Product;
+SET pMask = New Product Master_GBU_Division\Final\Product Master*.xlsx;
+//LET vSrcPathprev = vSrcPath;
+//
+//SET vSrcPath = D:\ANQVUAT3License\GIS 2.0 R2018-10 UAT;
+//SET pMask = \Final\Product Master*.xlsx;
+//
+SET pLoad = RecNo() as RN
+		,FilePath() as FN
+		,Text(Trim([Product Number])) as [Product Number]
+		,[Active Product],[Product Status],[Product Name],[Item Type],[Legacy ASPN]
+		,[Ansell Standard UOM],[Ansell Standard UOM Conversion],[Brand],[Sub Brand]
+		,[M4 Family],[M4 Group],[M4 Category],[M4 Segment],[Transfer Price Category (M4)]
+
+		,if(
+			Alt(Len(Purgechar([Product Division],$(vPurgeChars))),0)=0
+			,'0'
+			,Text([Product Division])) as [Product Division]
+		,Text([Product Division]) as [Product Division.src]
+
+		,[Product Family],[Product Category],[Brand Strategy],[Launch Date]
+		,[Launch Year],[Org Product Number]
+
+		,if(
+			Alt(Len(Purgechar([Brand Family],$(vPurgeChars))),0)=0
+			,'0'
+			,Text([Brand Family])) as [Brand Family]
+		,if(
+			Alt(Len(Purgechar([NPS],$(vPurgeChars))),0)=0
+			,'0'
+			,Text([NPS])) as [NPS]
+		,if(
+			Alt(Len(Purgechar([Technology Primary],$(vPurgeChars))),0)=0
+			,'0'
+			,Text([Technology Primary])) as [Technology Primary]
+		,if(
+			Alt(Len(Purgechar([Technology Secondary],$(vPurgeChars))),0)=0
+			,'0'
+			,Text([Technology Secondary])) as [Technology Secondary]
+
+
+		,if(
+			Alt(Len(Purgechar([Source],$(vPurgeChars))),0)=0
+			,'0'
+			,Text([Source])) as [Source]
+		,Text([Source]) as [Source.src]
+		,if(
+			Alt(Len(Purgechar([Origin],$(vPurgeChars))),0)=0
+			,'0'
+			,Text([Origin])) as [Origin]
+		,Text([Origin]) as [Origin.src]
+
+		,[ABC Class],[Variant],[Style],[Style Description]
+		,'0' as [Ventilation Type]	,'0' as [Certified]			,'0' as [Primary Seam]
+		,'0' as [Secondary Seam]	,'0' as [Model No_]			,'0' as [NSR]
+		,'0' as [NSR No_]			,'0' as [Primary Colour]	,'0' as [Reporting Size]
+		,'0' as [Glove Type]		,'0' as [Foot Type]			,'0' as [Packing Code]
+		,'0' as [Stocking Type]		,'0' as [Budget Code]
+		
+		,Null()	as [Product Status.src]
+		,Null() as [Product Division.src2]
+		,Null()	as [Brand.src]
+		,Null()	as [Variant.src]
+		,Null() as [M4 Family.src]
+		,Null() as [M4 Group.src]
+		,Null() as [M4 Category.src]
+		,Null() as [Brand Strategy.src]
+
+		,[SBU];
+SET pFileSpec = ooxml, embedded labels, table is Product;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+//
+//LET vSrcPath = vSrcPathprev;
+//LET vSrcPathprev = null();
+//
+
+
+IF not IsNull(TableNumber('MASTER_Product')) then
+
+	IF not IsNull(TableNumber('MASTER_GBU')) then
+	
+		Left Join ([MASTER_Product])
+			LOAD Distinct
+				[Product Division]
+				,[GBU]
+			Resident [MASTER_GBU];
+		
+		CALL DropTable('MASTER_GBU');
+	
+	ELSE
+
+		Left Join ([MASTER_Product])
+			LOAD Distinct
+				Null() as [Product Division]
+				,Null() as [GBU]
+			AutoGenerate(0);
+	
+	ENDIF;
+
+	IF not IsNull(TableNumber('MDM Filter')) then
+	
+		Left Join ([MASTER_Product])
+			LOAD Distinct
+				[Source]
+				,[MDM STATUS]
+			Resident [MDM Filter];
+		
+		CALL DropTable('MDM Filter');
+	
+	ELSE
+
+		Left Join ([MASTER_Product])
+			LOAD Distinct
+				Null() as [Source]
+				,Null() as [MDM STATUS]
+			AutoGenerate(0);
+	
+	ENDIF;
+	
+	IF Alt(FileSize(vINCPath&'PBCS_ProductHierarchy_flat.csv'),0)>0 THEN
+	
+		ProductPBCSData:
+		NoConcatenate
+		LOAD 
+			 Text(Trim(ProductNumber)) 				as [Product Number] 
+		     ,Text(Trim([PlanningStyle]))			as [PBCS Style]
+		     ,Text(Trim([PlanningHierarchy]))		as [PBCS Planning Hierarchy]
+		     ,Text(Trim([ProductName]))				as [PBCS Product Name]
+		     ,Text(Trim([StyleDescription]))		as [PBCS Style Description] 
+		     ,Text(Trim([PlanningSBU]))				as [PBCS SBU]  
+		FROM
+		[$(vINCPath)PBCS_ProductHierarchy_flat.csv]
+		(txt, utf8, embedded labels, delimiter is ',', msq);
+		
+		mPBCSStyle:
+		Mapping
+		LOAD Distinct
+			[Product Number]
+			,[PBCS Style]
+		Resident [ProductPBCSData];
+		
+		mPBCSPlanningHierarchy:
+		Mapping
+		LOAD Distinct
+			[Product Number]
+			,[PBCS Planning Hierarchy]
+		Resident [ProductPBCSData];
+		
+		mPBCSProductName:
+		Mapping
+		LOAD Distinct
+			[Product Number]
+			,[PBCS Product Name]
+		Resident [ProductPBCSData];
+		
+		mPBCSStyleDescription:
+		Mapping
+		LOAD Distinct
+			[Product Number]
+			,[PBCS Style Description] 
+		Resident [ProductPBCSData];
+		
+		mPBCSSBU:
+		Mapping
+		LOAD Distinct
+			[Product Number]
+			,[PBCS SBU]
+		Resident [ProductPBCSData];
+		
+		DROP Table [ProductPBCSData];
+	
+	ELSE 
+	
+		mPBCSStyle:
+		Mapping
+		LOAD Distinct
+			'{NULL}' 	as [Product Number]
+			,'{NULL}' 	as [PBCS Style]
+		AutoGenerate 1;
+		
+		mPBCSPlanningHierarchy:
+		Mapping
+		LOAD Distinct
+			'{NULL}' 	as [Product Number]
+			,'{NULL}' 	as [PBCS Planning Hierarchy]
+		AutoGenerate 1;
+		
+		mPBCSProductName:
+		Mapping
+		LOAD Distinct
+			'{NULL}' 	as [Product Number]
+			,'{NULL}' 	as [PBCS Product Name]
+		AutoGenerate 1;
+		
+		mPBCSStyleDescription:
+		Mapping
+		LOAD Distinct
+			'{NULL}' 	as [Product Number]
+			,'{NULL}' 	as [PBCS Style Description] 
+		AutoGenerate 1;
+		
+		mPBCSSBU:
+		Mapping
+		LOAD Distinct
+			'{NULL}' 	as  [Product Number]
+			,'{NULL}' 	as  [PBCS SBU]
+		AutoGenerate 1;
+	
+	ENDIF;
+	
+	RENAME Table [MASTER_Product] to [Temp_MASTER_Product];
+	
+	[MASTER_Product]:
+	NoConcatenate
+	LOAD
+		*
+		,ApplyMap('mPBCSStyle',[Product Number],'{NULL}')				as [PBCS Style]
+		,ApplyMap('mPBCSPlanningHierarchy',[Product Number],'{NULL}')	as [PBCS Planning Hierarchy]
+		,ApplyMap('mPBCSProductName',[Product Number],'{NULL}')			as [PBCS Product Name]
+		,ApplyMap('mPBCSStyleDescription',[Product Number],'{NULL}')	as [PBCS Style Description]
+		,ApplyMap('mPBCSSBU',[Product Number],'{NULL}')					as [PBCS SBU]	
+	Resident [Temp_MASTER_Product];
+	
+	DROP Table [Temp_MASTER_Product];
+
+	STORE 
+		[Product Number],[Active Product],[Product Status],[Product Name],[Item Type],[Legacy ASPN]
+		,[Ansell Standard UOM],[Ansell Standard UOM Conversion],[Brand],[Sub Brand],[M4 Family]
+		,[M4 Group],[M4 Category],[M4 Segment],[Transfer Price Category (M4)],[Product Division],[GBU]
+		,[Product Family],[Product Category],[Brand Strategy],[Launch Date],[Launch Year]
+		,[Org Product Number],[Source],[MDM STATUS],[Origin],[ABC Class],[Variant],[Style]
+		,[Style Description],[Ventilation Type],[Certified],[Primary Seam],[Secondary Seam]
+		,[Model No_],[NSR],[NSR No_],[Primary Colour],[Reporting Size],[Glove Type],[Foot Type]
+		,[Packing Code],[Stocking Type],[Budget Code],[FN]
+		,[Brand Family],  [NPS], [Technology Primary], [Technology Secondary]
+		,[SBU],[PBCS Style],[PBCS Planning Hierarchy],[PBCS Product Name],[PBCS Style Description],[PBCS SBU]		
+	from [MASTER_Product] 
+	into '$(vQVDPath)Product.qvd' (qvd);
+	
+	Left Join ([MASTER_Product])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC]
+		Resident [MASTER_Product]
+		Where 
+			Not ([Product Division] = [Product Division.src]) 
+			or Not ([Source] = [Source.src]) 
+			or Not ([Origin] = [Origin.src])
+			or Match([Product Status],'ACTIVE','OBSOLETE','INACTIVE') = 0
+			or Match([Product Division],'MED','MED-MF','HSS','HSS-PSP','HSS-SAND','IND','IND-COMAS','IND-MID','BP','BP-APS','BP-HERC','BP-COMAS','BP-MF','BP-ONG','BP-MG','SU','SU-MF','SU-COMAS','SW') = 0
+			or Alt(Len(Purgechar([Brand],$(vPurgeChars))),0)	=0
+			or Alt(Len(Purgechar([Variant],$(vPurgeChars))),0)	=0
+			or Alt(Len(Purgechar([M4 Family],$(vPurgeChars))),0)=0
+			or Alt(Len(Purgechar([M4 Group],$(vPurgeChars))),0)	=0
+			or Alt(Len(Purgechar([M4 Category],$(vPurgeChars))),0)=0
+			or Match([Brand Strategy],'GROWTH','MAINTAIN','NON-CORE','OEM & TENDER') = 0
+			;
+	
+		Left Join ([MASTER_Product])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC_LY]
+		Resident [MASTER_Product]
+		Where IsNull(Num#(Right([Launch Year],2)))
+			or Not Left([Launch Year],1) like 'F??' 
+			;
+	
+	IF FieldValueCount('QC') > 0 then
+		
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('MASTER_Product',cWARNING,vMessage,'Product Division.src'			,'Product Division'		,vWhere);
+		CALL LogMessage('MASTER_Product',cWARNING,vMessage,'Source.src'					,'Source'				,vWhere);
+		CALL LogMessage('MASTER_Product',cWARNING,vMessage,'Origin.src'					,'Origin'				,vWhere);
+		
+		SET vWhere = '[Product Status.src] = 0';
+		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(Match([Product Status],'ACTIVE','OBSOLETE','INACTIVE') = 0,';[Product Status] "'&[Product Status]&'". Not in list: ACTIVE, OBSOLETE, INACTIVE;','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('MASTER_Product',13,vMessage,'Product Status'			,'ACTIVE,OBSOLETE,INACTIVE'		,vWhere);
+	
+		SET vWhere = '[Product Division.src2] = 0';
+		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(not ([Product Division] = [Product Division.src]),';[Product Division] "'&[Product Division.src]&'". Replaced with "'&[Product Division]&'";','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('MASTER_Product',13,vMessage,'Product Division','MED,MED-MF,HSS,HSS-PSP,HSS-SAND,IND,IND-COMAS,IND-MID,BP,BP-APS,BP-HERC,BP-COMAS,BP-MF,BP-ONG,BP-MG,SU,SU-MF,SU-COMAS,SW',vWhere);
+	
+		SET vWhere = '[Brand.src] = 0';
+		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(Alt(Len(Purgechar([Brand],$(vPurgeChars))),0)=0,';[Brand] is empty;','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('MASTER_Product',13,vMessage,'Variant','0',vWhere);
+		
+		SET vWhere = '[Variant.src] = 0';
+		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(Alt(Len(Purgechar([Variant],$(vPurgeChars))),0)=0,';[Variant] is empty;','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('MASTER_Product',13,vMessage,'Variant','0',vWhere);
+	
+		SET vWhere = '[M4 Family.src] = 0';
+		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(Alt(Len(Purgechar([M4 Family],$(vPurgeChars))),0)=0,';[M4 Family] is empty;','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('MASTER_Product',13,vMessage,'M4 Family','0',vWhere);
+	 
+	 	SET vWhere = '[M4 Group.src] = 0';
+	 	SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(Alt(Len(Purgechar([M4 Group],$(vPurgeChars))),0)=0,';[M4 Group] is empty;','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('MASTER_Product',13,vMessage,'M4 Group','0',vWhere);
+		
+		SET vWhere = '[M4 Category.src] = 0';
+		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(Alt(Len(Purgechar([M4 Category],$(vPurgeChars))),0)=0,';[M4 Category] is empty;','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('MASTER_Product',13,vMessage,'M4 Category','0',vWhere);
+		
+		SET vWhere = '[Brand Strategy.src] = 0';
+		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(Match([Brand Strategy],'GROWTH','MAINTAIN','NON-CORE','OEM & TENDER') = 0,';[Brand Strategy] "'&[Brand Strategy]&'". Not in list: GROWTH, MAINTAIN, NON-CORE, OEM & TENDER;','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('MASTER_Product',13,vMessage,'Brand Strategy','GROWTH,MAINTAIN,NON-CORE,OEM & TENDER',vWhere);
+		
+	ENDIF
+	
+	IF FieldValueCount('QC_LY') > 0 then
+		SET vWhere = QC_LY <> 0;
+		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(IsNull(Date#([Launch Date],'MM/DD/YYYY')),';[Launch Date] "'&[Launch Date]&'" is missing or not in proper format: MM/DD/YYYY;','')
+					&if(Not Left([Launch Year],1) like 'F??' or IsNull(Num#(Right([Launch Year],2)))
+						,';[Launch Year] "'&[Launch Year]&'" is missing or not in proper format: FXX;','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('MASTER_Product',13,vMessage,'Launch Year'					,'Left([Launch Year],1) like F??'				,vWhere);
+	ENDIF
+
+
+	CALL CheckDoubles('MASTER_Product','Product Number');
+	CALL LogMessage('MASTER_Product',cSUCCESSFUL);
+	
+	CALL DropTable('MASTER_Product');
+
+ENDIF;
+
+LET vMessage = Null();
+///$tab Product
+//SET pTable = MASTER_Product;
+//SET pMask = New Product Master_GBU_Division\Final\Product Master*.xlsx;
+//SET pLoad = RecNo() as RN
+//		,FilePath() as FN
+//		,Text(Trim([Product Number])) as [Product Number]
+//		,[Active Product],[Product Status],[Product Name],[Item Type],[Legacy ASPN]
+//		,[Ansell Standard UOM],[Ansell Standard UOM Conversion],[Brand],[Sub Brand]
+//		,[M4 Family],[M4 Group],[M4 Category],[Transfer Price Category (M4)]
+//
+//		,if(
+//			Alt(Len(Purgechar([Product Division],$(vPurgeChars))),0)=0
+//			,'0'
+//			,Text([Product Division])) as [Product Division]
+//		,Text([Product Division]) as [Product Division.src]
+//
+//		,[Product Family],[Product Category],[Brand Strategy],[Launch Date]
+//		,[Launch Year],[Org Product Number]
+//
+//		,if(
+//			Alt(Len(Purgechar([Source],$(vPurgeChars))),0)=0
+//			,'0'
+//			,Text([Source])) as [Source]
+//		,Text([Source]) as [Source.src]
+//		,if(
+//			Alt(Len(Purgechar([Origin],$(vPurgeChars))),0)=0
+//			,'0'
+//			,Text([Origin])) as [Origin]
+//		,Text([Origin]) as [Origin.src]
+//
+//		,[ABC Class],[Variant],[Style],[Style Description]
+//		,'0' as [Ventilation Type]	,'0' as [Certified]			,'0' as [Primary Seam]
+//		,'0' as [Secondary Seam]	,'0' as [Model No_]			,'0' as [NSR]
+//		,'0' as [NSR No_]			,'0' as [Primary Colour]	,'0' as [Reporting Size]
+//		,'0' as [Glove Type]		,'0' as [Foot Type]			,'0' as [Packing Code]
+//		,'0' as [Stocking Type]		,'0' as [Budget Code];
+//SET pFileSpec = ooxml, embedded labels, table is Sheet1;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_Product;
+//SET pMask = New Product Master_GBU_Division\Final\Microgard*.xlsx;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text(Trim([Product Number])) as [Product Number]
+//		,[Active Product],[Product Status],[Product Name],[Item Type],[Legacy ASPN]
+//		,[Ansell Standard UOM],[Ansell Standard UOM Conversion],[Brand],[Sub Brand]
+//		,[M4 Family],[M4 Group],[M4 Category],[Transfer Price Category (M4)]
+//
+//		,if(
+//			Alt(Len(Purgechar([Product Division],$(vPurgeChars))),0)=0
+//			,'0'
+//			,Text([Product Division])) as [Product Division]
+//		,Text([Product Division]) 	as [Product Division.src]
+//
+//		,[Product Family],[Product Category],[Brand Strategy],[Launch Date]
+//		,[Launch Year],[Org Product Number]
+//
+//		,if(
+//			Alt(Len(Purgechar([Source],$(vPurgeChars))),0)=0
+//			,'0'
+//			,Text([Source])) as [Source]
+//		,Text([Source]) as [Source.src]
+//		,if(
+//			Alt(Len(Purgechar([Origin],$(vPurgeChars))),0)=0
+//			,'0'
+//			,Text([Origin])) as [Origin]
+//		,Text([Origin]) as [Origin.src]
+//		
+//		,Match([Product Status],'ACTIVE','OBSOLETE','INACTIVE')	as [Product Status.src]
+//		,Match([Product Division],'MED','MED-MF','HSS','HSS-PSP','HSS-SAND','IND','IND-COMAS','IND-MID','BP','BP-APS','BP-HERC','BP-COMAS','BP-MF','BP-ONG','BP-MG','SU','SU-MF','SU-COMAS','SW') as [Product Division.src2]
+//		,Alt(Len(Purgechar([Brand],$(vPurgeChars))),0)			as [Brand.src]
+//		,Alt(Len(Purgechar([Variant],$(vPurgeChars))),0)		as [Variant.src]
+//		,Alt(Len(Purgechar([M4 Family],$(vPurgeChars))),0)		as [M4 Family.src]
+//		,Alt(Len(Purgechar([M4 Group],$(vPurgeChars))),0)		as [M4 Group.src]
+//		,Alt(Len(Purgechar([M4 Category],$(vPurgeChars))),0)	as [M4 Category.src]
+//		,Match([Brand Strategy],'GROWTH','MAINTAIN','NON-CORE','OEM & TENDER') 	as [Brand Strategy.src]
+//
+//
+//		,[ABC Class],[Variant],[Style],[Style Description],[Ventilation Type]
+//		,[Certified],[Primary Seam],[Secondary Seam],[Model No_],[NSR],[NSR No_]
+//		,[Primary Colour],[Reporting Size],[Glove Type],[Foot Type],[Packing Code]
+//		,[Stocking Type],[Budget Code];
+//SET pFileSpec = ooxml, embedded labels, table is Sheet1;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable = Null(); LET pMask = Null(); LET pLoad = Null(); LET pFileSpec = Null();
+//
+//IF not IsNull(TableNumber('MASTER_Product')) then
+//
+//	IF not IsNull(TableNumber('MASTER_GBU')) then
+//	
+//		Left Join ([MASTER_Product])
+//			LOAD Distinct
+//				[Product Division]
+//				,[GBU]
+//			Resident [MASTER_GBU];
+//		
+//		CALL DropTable('MASTER_GBU');
+//	
+//	ELSE
+//
+//		Left Join ([MASTER_Product])
+//			LOAD Distinct
+//				Null() as [Product Division]
+//				,Null() as [GBU]
+//			AutoGenerate(0);
+//	
+//	ENDIF;
+//
+//	IF not IsNull(TableNumber('MDM Filter')) then
+//	
+//		Left Join ([MASTER_Product])
+//			LOAD Distinct
+//				[Source]
+//				,[MDM STATUS]
+//			Resident [MDM Filter];
+//		
+//		CALL DropTable('MDM Filter');
+//	
+//	ELSE
+//
+//		Left Join ([MASTER_Product])
+//			LOAD Distinct
+//				Null() as [Source]
+//				,Null() as [MDM STATUS]
+//			AutoGenerate(0);
+//	
+//	ENDIF;
+//
+//	STORE 
+//		[Product Number],[Active Product],[Product Status],[Product Name],[Item Type],[Legacy ASPN]
+//		,[Ansell Standard UOM],[Ansell Standard UOM Conversion],[Brand],[Sub Brand],[M4 Family]
+//		,[M4 Group],[M4 Category],[Transfer Price Category (M4)],[Product Division],[GBU]
+//		,[Product Family],[Product Category],[Brand Strategy],[Launch Date],[Launch Year]
+//		,[Org Product Number],[Source],[MDM STATUS],[Origin],[ABC Class],[Variant],[Style]
+//		,[Style Description],[Ventilation Type],[Certified],[Primary Seam],[Secondary Seam]
+//		,[Model No_],[NSR],[NSR No_],[Primary Colour],[Reporting Size],[Glove Type],[Foot Type]
+//		,[Packing Code],[Stocking Type],[Budget Code],[FN]
+//	from [MASTER_Product] 
+//	into '$(vQVDPath)Product.qvd' (qvd);
+//	
+//	Left Join ([MASTER_Product])
+//		LOAD Distinct
+//			[RN]
+//			,[FN]
+//			,1 as [QC]
+//		Resident [MASTER_Product]
+//		Where 
+//			Not ([Product Division] = [Product Division.src]) 
+//			or Not ([Source] = [Source.src]) 
+//			or Not ([Origin] = [Origin.src])
+//			or Match([Product Status],'ACTIVE','OBSOLETE','INACTIVE') = 0
+//			or Match([Product Division],'MED','MED-MF','HSS','HSS-PSP','HSS-SAND','IND','IND-COMAS','IND-MID','BP','BP-APS','BP-HERC','BP-COMAS','BP-MF','BP-ONG','BP-MG','SU','SU-MF','SU-COMAS','SW') = 0
+//			or Alt(Len(Purgechar([Brand],$(vPurgeChars))),0)	=0
+//			or Alt(Len(Purgechar([Variant],$(vPurgeChars))),0)	=0
+//			or Alt(Len(Purgechar([M4 Family],$(vPurgeChars))),0)=0
+//			or Alt(Len(Purgechar([M4 Group],$(vPurgeChars))),0)	=0
+//			or Alt(Len(Purgechar([M4 Category],$(vPurgeChars))),0)=0
+//			or Match([Brand Strategy],'GROWTH','MAINTAIN','NON-CORE','OEM & TENDER') = 0
+//			;
+//	
+//		Left Join ([MASTER_Product])
+//		LOAD Distinct
+//			[RN]
+//			,[FN]
+//			,1 as [QC_LY]
+//		Resident [MASTER_Product]
+//		Where IsNull(Num#(Right([Launch Year],2)))
+//			or Not Left([Launch Year],1) like 'F??' 
+//			;
+//	
+//	IF FieldValueCount('QC') > 0 then
+//		
+//		SET vWhere = and QC <> 0;
+//		CALL LogMessage('MASTER_Product',cWARNING,vMessage,'Product Division.src'			,'Product Division'		,vWhere);
+//		CALL LogMessage('MASTER_Product',cWARNING,vMessage,'Source.src'					,'Source'				,vWhere);
+//		CALL LogMessage('MASTER_Product',cWARNING,vMessage,'Origin.src'					,'Origin'				,vWhere);
+//		
+//		SET vWhere = '[Product Status.src] = 0';
+//		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+//			&replace(
+//				replace(
+//					';;'
+//					&if(Match([Product Status],'ACTIVE','OBSOLETE','INACTIVE') = 0,';[Product Status] "'&[Product Status]&'". Not in list: ACTIVE, OBSOLETE, INACTIVE;','')
+//					&';;'
+//					,';;;'
+//					,'')
+//				,';;'
+//				,chr(10)&chr(13))
+//			;
+//		CALL LogMessage('MASTER_Product',13,vMessage,'Product Status'			,'ACTIVE,OBSOLETE,INACTIVE'		,vWhere);
+//	
+//		SET vWhere = '[Product Division.src2] = 0';
+//		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+//			&replace(
+//				replace(
+//					';;'
+//					&if(not ([Product Division] = [Product Division.src]),';[Product Division] "'&[Product Division.src]&'". Replaced with "'&[Product Division]&'";','')
+//					&';;'
+//					,';;;'
+//					,'')
+//				,';;'
+//				,chr(10)&chr(13))
+//			;
+//		CALL LogMessage('MASTER_Product',13,vMessage,'Product Division','MED,MED-MF,HSS,HSS-PSP,HSS-SAND,IND,IND-COMAS,IND-MID,BP,BP-APS,BP-HERC,BP-COMAS,BP-MF,BP-ONG,BP-MG,SU,SU-MF,SU-COMAS,SW',vWhere);
+//	
+//		SET vWhere = '[Brand.src] = 0';
+//		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+//			&replace(
+//				replace(
+//					';;'
+//					&if(Alt(Len(Purgechar([Brand],$(vPurgeChars))),0)=0,';[Brand] is empty;','')
+//					&';;'
+//					,';;;'
+//					,'')
+//				,';;'
+//				,chr(10)&chr(13))
+//			;
+//		CALL LogMessage('MASTER_Product',13,vMessage,'Variant','0',vWhere);
+//		
+//		SET vWhere = '[Variant.src] = 0';
+//		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+//			&replace(
+//				replace(
+//					';;'
+//					&if(Alt(Len(Purgechar([Variant],$(vPurgeChars))),0)=0,';[Variant] is empty;','')
+//					&';;'
+//					,';;;'
+//					,'')
+//				,';;'
+//				,chr(10)&chr(13))
+//			;
+//		CALL LogMessage('MASTER_Product',13,vMessage,'Variant','0',vWhere);
+//	
+//		SET vWhere = '[M4 Family.src] = 0';
+//		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+//			&replace(
+//				replace(
+//					';;'
+//					&if(Alt(Len(Purgechar([M4 Family],$(vPurgeChars))),0)=0,';[M4 Family] is empty;','')
+//					&';;'
+//					,';;;'
+//					,'')
+//				,';;'
+//				,chr(10)&chr(13))
+//			;
+//		CALL LogMessage('MASTER_Product',13,vMessage,'M4 Family','0',vWhere);
+//	 
+//	 	SET vWhere = '[M4 Group.src] = 0';
+//	 	SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+//			&replace(
+//				replace(
+//					';;'
+//					&if(Alt(Len(Purgechar([M4 Group],$(vPurgeChars))),0)=0,';[M4 Group] is empty;','')
+//					&';;'
+//					,';;;'
+//					,'')
+//				,';;'
+//				,chr(10)&chr(13))
+//			;
+//		CALL LogMessage('MASTER_Product',13,vMessage,'M4 Group','0',vWhere);
+//		
+//		SET vWhere = '[M4 Category.src] = 0';
+//		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+//			&replace(
+//				replace(
+//					';;'
+//					&if(Alt(Len(Purgechar([M4 Category],$(vPurgeChars))),0)=0,';[M4 Category] is empty;','')
+//					&';;'
+//					,';;;'
+//					,'')
+//				,';;'
+//				,chr(10)&chr(13))
+//			;
+//		CALL LogMessage('MASTER_Product',13,vMessage,'M4 Category','0',vWhere);
+//		
+//		SET vWhere = '[Brand Strategy.src] = 0';
+//		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+//			&replace(
+//				replace(
+//					';;'
+//					&if(Match([Brand Strategy],'GROWTH','MAINTAIN','NON-CORE','OEM & TENDER') = 0,';[Brand Strategy] "'&[Brand Strategy]&'". Not in list: GROWTH, MAINTAIN, NON-CORE, OEM & TENDER;','')
+//					&';;'
+//					,';;;'
+//					,'')
+//				,';;'
+//				,chr(10)&chr(13))
+//			;
+//		CALL LogMessage('MASTER_Product',13,vMessage,'Brand Strategy','GROWTH,MAINTAIN,NON-CORE,OEM & TENDER',vWhere);
+//		
+//	ENDIF
+//	
+//	IF FieldValueCount('QC_LY') > 0 then
+//		SET vWhere = QC_LY <> 0;
+//		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+//			&replace(
+//				replace(
+//					';;'
+//					&if(IsNull(Date#([Launch Date],'MM/DD/YYYY')),';[Launch Date] "'&[Launch Date]&'" is missing or not in proper format: MM/DD/YYYY;','')
+//					&if(Not Left([Launch Year],1) like 'F??' or IsNull(Num#(Right([Launch Year],2)))
+//						,';[Launch Year] "'&[Launch Year]&'" is missing or not in proper format: FXX;','')
+//					&';;'
+//					,';;;'
+//					,'')
+//				,';;'
+//				,chr(10)&chr(13))
+//			;
+//		CALL LogMessage('MASTER_Product',13,vMessage,'Launch Year'					,'Left([Launch Year],1) like F??'				,vWhere);
+//	ENDIF
+//
+//
+///*
+//	IF FieldValueCount('QC') > 0 then
+//	
+//		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+//			&replace(
+//				replace(
+//					';;'
+//					&if(not ([Source] = [Source.src]),';[Source] "'&[Source.src]&'". Replaced with "'&[Source]&'";','')
+//					&if(not ([Origin] = [Origin.src]),';[Origin] "'&[Origin.src]&'". Replaced with "'&[Origin]&'";','')
+//					&if(Match([Product Status],'ACTIVE','OBSOLETE','INACTIVE') = 0,';[Product Status] "'&[Product Status]&'". Not in list: ACTIVE, OBSOLETE, INACTIVE;','')
+//					&if(not ([Product Division] = [Product Division.src]),';[Product Division] "'&[Product Division.src]&'". Replaced with "'&[Product Division]&'";','')
+//					&if(Match([Product Division],'MED','MED-MF','HSS','HSS-PSP','HSS-SAND','IND','IND-COMAS','IND-MID','BP','BP-APS','BP-HERC','BP-COMAS','BP-MF','BP-ONG','BP-MG','SU','SU-MF','SU-COMAS','SW') = 0
+//						,';[Product Division] "'&[Product Division]&'". Not in list: MED, MED-MF, HSS, HSS-PSP, HSS-SAND, IND, IND-COMAS, IND-MID, BP, BP-APS, BP-HERC, BP-COMAS, BP-MF, BP-ONG, BP-MG, SU, SU-MF, SU-COMAS, SW;','')
+//					&if(Alt(Len(Purgechar([Brand],$(vPurgeChars))),0)=0,';[Brand] is empty;','')
+//					&if(Alt(Len(Purgechar([Variant],$(vPurgeChars))),0)=0,';[Variant] is empty;','')
+//					&if(Alt(Len(Purgechar([M4 Family],$(vPurgeChars))),0)=0,';[M4 Family] is empty;','')
+//					&if(Alt(Len(Purgechar([M4 Group],$(vPurgeChars))),0)=0,';[M4 Group] is empty;','')
+//					&if(Alt(Len(Purgechar([M4 Category],$(vPurgeChars))),0)=0,';[M4 Category] is empty;','')
+//					&if(Match([Brand Strategy],'GROWTH','MAINTAIN','NON-CORE','OEM & TENDER') = 0,';[Brand Strategy] "'&[Brand Strategy]&'". Not in list: GROWTH, MAINTAIN, NON-CORE, OEM & TENDER;','')
+//					&if(IsNull(Date#([Launch Date],'MM/DD/YYYY')),';[Launch Date] "'&[Launch Date]&'" is missing or not in proper format: MM/DD/YYYY;','')
+//					&if(Not Left([Launch Year],1) like 'F??' or IsNull(Num#(Right([Launch Year],2)))
+//						,';[Launch Year] "'&[Launch Year]&'" is missing or not in proper format: FXX;','')
+//					&';;'
+//					,';;;'
+//					,'')
+//				,';;'
+//				,chr(10)&chr(13))
+//			;
+//		CALL LogMessage('Product',cWARNING,vMessage);
+//	
+//	ENDIF;
+//*/
+//	CALL CheckDoubles('MASTER_Product','Product Number');
+//	CALL LogMessage('MASTER_Product',cSUCCESSFUL);
+//	
+//	CALL DropTable('MASTER_Product');
+//
+//ENDIF;
+//
+//LET vMessage = Null();
+///$tab Customer
+//SET pTable = MASTER_Customer;
+//SET pMask = Master\Customer MASTER*.xlsx;
+//SET pLoad = RecNo() as RN
+//		,FilePath() as FN
+//		,Text(Trim([Customer ID])) as [Customer Number]
+//
+//		,[Region] as [Region.src]
+//		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+//
+//		,[DIVISION] as [Customer Division]
+//		,[OPERATING UNIT]
+//		
+//		,0 as [INDUSTRY (IN BI)]
+//		
+//		,Capitalize([Customer Name]) as [Customer Name]
+//		,[Market]
+//		,[Customer Industry]
+//		,[Customer Sub-industry]
+//		
+//		,'NA-LAC' as [Customer Flag]
+//
+//		,[Customer Type];
+//SET pFileSpec = ooxml, embedded labels, table is Customer;
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_Customer;
+//SET pMask = Master\Sandel Master\SandelMaster QVD\SandelCustomer.qvd;
+//SET pLoad = RecNo() as RN
+//		,FilePath() as FN
+//		,Text(Trim([Customer ID])) as [Customer Number]
+//
+//		,[Region] as [Region.src]
+//		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+//
+//		,[DIVISION] as [Customer Division]
+//		,[OPERATING UNIT]
+//		
+//		,0 as [INDUSTRY (IN BI)]
+//		
+//		,Capitalize([Customer Name]) as [Customer Name]
+//		,[Market]
+//		,[Customer Industry]
+//		,[Customer Sub-industry]
+//		
+//		,'Sandel' as [Customer Flag]
+//
+//		,[Customer Type];
+//SET pFileSpec = qvd;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_Customer;
+//SET pMask = BSSI Automated\BSSI Sales & Customer Master QVD\Customer Master\Customer*.qvd;
+//SET pLoad = RecNo() as RN
+//		,FilePath() as FN
+//		,Text(Trim([Customer ID])) as [Customer Number]
+//
+//		,[Region] as [Region.src]
+//		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+//
+//		,[Division] as [Customer Division]
+//		
+//		,0 as [OPERATING UNIT]
+//		
+//		,0 as [INDUSTRY (IN BI)]
+//		
+//		,Capitalize([Customer Name]) as [Customer Name]
+//		,[Market]
+//		,[Customer Industry]
+//		,[Customer Sub-industry]
+//		
+//		,'BSSI-OGI' as [Customer Flag]
+//
+//		,[Customer Type];
+//SET pFileSpec = qvd;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_Customer;
+//SET pMask = APAC\APAC Masters\Customer*.xlsx;
+//SET pLoad = RecNo() as RN
+//		,FilePath() as FN
+//		,Text(Trim([Customer ID])) as [Customer Number]
+//
+//		,[Region] as [Region.src]
+//		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+//
+//		,[DIVISION] as [Customer Division]
+//		,[OPERATING UNIT]
+//		
+//		,0 as [INDUSTRY (IN BI)]
+//		
+//		,Capitalize([Customer Name]) as [Customer Name]
+//		,[Market]
+//		,[Customer Industry]
+//		,[Customer Sub-industry]
+//		
+//		,'MIDAS' as [Customer Flag]
+//
+//		,[Customer Type];
+//SET pFileSpec = ooxml, embedded labels, table is Customer;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_Customer;
+//SET pMask = EMEA Datausing in GIS\EMEA Master\Customer*.xlsx;
+//SET pLoad = RecNo() as RN
+//		,FilePath() as FN
+//		,Text(Trim([Customer ID])) as [Customer Number]
+//
+//		,[Region] as [Region.src]
+//		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+//
+//		,[DIVISION] as [Customer Division]
+//		,[OPERATING UNIT]
+//		
+//		,0 as [INDUSTRY (IN BI)]
+//		
+//		,Capitalize([Customer Name]) as [Customer Name]
+//		,[Market]
+//		,[Customer Industry]
+//		,[Customer Sub-industry]
+//		
+//		,'EMEA' as [Customer Flag]
+//
+//		,[Customer Type];
+//SET pFileSpec = ooxml, embedded labels, table is Customer;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_Customer;
+//SET pMask = APAC\RAMCO\Master\Customer*.qvd;
+//SET pLoad = RecNo() as RN
+//		,FilePath() as FN
+//		,Text(Trim([Customer ID])) as [Customer Number]
+//
+//		,[Region] as [Region.src]
+//		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+//
+//		,[Division] as [Customer Division]
+//
+//		,0 as [OPERATING UNIT]
+//		,0 as [INDUSTRY (IN BI)]
+//		
+//		,Capitalize([Customer Name]) as [Customer Name]
+//		,[Market]
+//		,[Customer Industry]
+//		,[Customer Sub-industry]
+//		
+//		,'RAMCO' as [Customer Flag]
+//
+//		,[Customer Type];
+//SET pFileSpec = qvd;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_Customer;
+//SET pMask = APS\Masters\Customer*.xlsx;
+//SET pLoad = RecNo() as RN
+//		,FilePath() as FN
+//		,Text(Trim([Customer ID])) as [Customer Number]
+//
+//		,[Region] as [Region.src]
+//		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+//
+//		,[DIVISION] as [Customer Division]
+//
+//		,0 as [OPERATING UNIT]
+//		,0 as [INDUSTRY (IN BI)]
+//		
+//		,Capitalize([Customer Name]) as [Customer Name]
+//		,[Market]
+//		,[Customer Industry]
+//		,[Customer Sub-industry]
+//		
+//		,'APS' as [Customer Flag]
+//
+//		,[Customer Type];
+//SET pFileSpec = ooxml, embedded labels, table is Customer;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_Customer;
+//SET pMask = Microgard\Microgard Customer Master\Customer*.xlsx;
+//SET pLoad = RecNo() as RN
+//		,FilePath() as FN
+//		,Text(Trim([Customer ID])) as [Customer Number]
+//
+//		,[Region] as [Region.src]
+//		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+//
+//		,[DIVISION] as [Customer Division]
+//
+//		,0 as [OPERATING UNIT]
+//		,0 as [INDUSTRY (IN BI)]
+//		
+//		,Capitalize([Customer Name]) as [Customer Name]
+//		,[Market]
+//		,[Customer Industry]
+//		,[Customer Sub-industry]
+//		
+//		,'Microgard' as [Customer Flag]
+//
+//		,[Customer Type];
+//SET pFileSpec = ooxml, embedded labels, table is Customer;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_Customer;
+//SET pMask = EMEA Datausing in GIS\SAP Master\Customer.qvd;
+//SET pLoad = RecNo() as RN
+//		,FilePath() as FN
+//		,Text([Customer Number]) as [Customer Number]
+//
+//		,[Region] as [Region.src]
+//		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+//
+//		,[Customer Division]
+//		,[OPERATING UNIT]
+//		
+//		,0 as [INDUSTRY (IN BI)]
+//		
+//		,Capitalize([Customer Name]) as [Customer Name]
+//		,[Market]
+//		,[Customer Industry]
+//		,[Customer Sub-industry]
+//		
+//		,'SAP' as [Customer Flag]
+//
+//		,[Customer Type];
+//SET pFileSpec = qvd;
+//SET pCondition = WildMatch([Customer Number], 'SAP-*');
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//LET pCondition  = Null();
+//
+//SET pTable = Global_Customer;
+//SET pMask = Master\Global Customer Master\Global Customer Master.xlsx;
+//SET pLoad = RecNo() as RN
+//		,FilePath() as FN
+//		,Text(Trim([Customer Numbers])) as [Customer Number]
+//		,Capitalize([Global Customer]) as [Global Customer];
+//SET pFileSpec = ooxml, embedded labels, table is Sheet1;
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//IF not IsNull(TableNumber('MASTER_Customer')) then
+//
+//	IF not IsNull(TableNumber('Global_Customer')) then
+//	
+//		Left Join ([MASTER_Customer])
+//			LOAD Distinct
+//				[Customer Number]
+//				,[Global Customer]
+//			Resident [Global_Customer];
+//		
+//		CALL DropTable('Global_Customer');
+//	
+//	ELSE
+//
+//		Left Join ([MASTER_Customer])
+//			LOAD Distinct
+//				Null() as [Customer Number]
+//				,Null() as [Global Customer]
+//			AutoGenerate(0);
+//	
+//	ENDIF;
+//
+//	STORE 
+//		[Customer Number]
+//		,[Global Customer]
+//		,[Region]
+//		,[Customer Division]
+//		,[OPERATING UNIT]
+//		,[INDUSTRY (IN BI)]
+//		,[Customer Name]
+//		,[Market]
+//		,[Customer Industry]
+//		,[Customer Sub-industry]
+//		,[Customer Flag]
+//		,[Customer Type]
+//		,[FN]
+//	from [MASTER_Customer] 
+//	into '$(vQVDPath)Customer.qvd' (qvd);
+//	
+//	Left Join ([MASTER_Customer])
+//		LOAD Distinct
+//			[RN]
+//			,[FN]
+//			,1 as [QC]
+//		Resident [MASTER_Customer]
+//		Where 
+//			Not ([Region] = [Region.src])
+//			;
+//
+//	IF FieldValueCount('QC') > 0 then
+//		
+//		SET vWhere = and QC <> 0;
+//		CALL LogMessage('MASTER_Customer',cWARNING,vMessage,'Region.src'			,'Region'		,vWhere);
+//		
+//	ENDIF
+//	
+//	
+//	
+//	
+//	/*IF FieldValueCount('QC') > 0 then
+//	
+//		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+//			&replace(
+//				replace(
+//					';;'
+//					&if(not ([Region] = [Region.src]),';[Region] "'&[Region.src]&'". Replaced with "'&[Region]&'";','')
+//					&';;'
+//					,';;;'
+//					,'')
+//				,';;'
+//				,chr(10)&chr(13))
+//			;
+//		CALL LogMessage('Customer',cWARNING,vMessage);
+//	
+//	ENDIF;
+//	*/
+//	CALL CheckDoubles('MASTER_Customer','Customer Number');
+//	CALL LogMessage('MASTER_Customer',cSUCCESSFUL);
+//	
+//	CALL DropTable('MASTER_Customer');
+//
+//ENDIF;
+//
+//LET vMessage = Null();
+///$tab Customer NEW
+SET pTable = MASTER_Customer;
+SET pMask = Customer Master\NA_LAC\Customer MASTER*.xlsx;
+SET pLoad = RecNo() as RN
+		,FilePath() as FN
+		,Text(Trim([Customer ID])) as [Customer Number]
+
+		,[Region] as [Region.src]
+		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+
+		,[DIVISION] as [Customer Division]
+		,[OPERATING UNIT]
+		
+		,0 as [INDUSTRY (IN BI)]
+		
+		,Capitalize([Customer Name]) as [Customer Name]
+		,[Market]
+		,[Customer Industry]
+		,[Customer Sub-industry]
+		
+		,'NEW\NA-LAC' as [Customer Flag]
+
+		,[Customer Type]
+		,[Customer Segment]
+		,[Customer Group];
+SET pFileSpec = ooxml, embedded labels, table is Customer;
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+SET pTable = MASTER_Customer;
+SET pMask = Customer Master\Customer Master*.xlsx;
+SET pLoad = RecNo() as RN
+		,FilePath() as FN
+		,Text(Trim([Customer ID])) as [Customer Number]
+
+		,[Region] as [Region.src]
+		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+
+		,[DIVISION] as [Customer Division]
+		,[OPERATING UNIT]
+		
+		,0 as [INDUSTRY (IN BI)]
+		
+		,Capitalize([Customer Name]) as [Customer Name]
+		,[Market]
+		,[Customer Industry]
+		,[Customer Sub-industry]
+		
+		,'NEW' as [Customer Flag]
+
+		,[Customer Type]
+		,[Customer Segment]
+		,[Customer Group];
+SET pFileSpec = ooxml, embedded labels, table is Customer;
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+SET pTable = MASTER_Customer;
+SET pMask = EMEA Datausing in GIS\SAP Master2\Customer.qvd;
+SET pLoad = RecNo() as RN
+		,FilePath() as FN
+		,Text([Customer Number]) as [Customer Number]
+
+		,[Region] as [Region.src]
+		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+
+		,[Customer Division]
+		,[OPERATING UNIT]
+		
+		,[INDUSTRY (IN BI)] as [INDUSTRY (IN BI)]
+		
+		,Capitalize([Customer Name]) as [Customer Name]
+		,[Market]
+		,[Customer Industry]
+		,[Customer Sub-industry]
+		
+		,'SAP' as [Customer Flag]
+
+		,[Customer Type]
+		,[Customer Segment] as [Customer Segment]
+		,[CustomerGroup] as [Customer Group];
+SET pFileSpec = qvd;
+SET pCondition = WildMatch([Customer Number], 'SAP-*');
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+LET pCondition  = Null();
+
+//SET pTable = MASTER_Customer;
+//SET pMask = APAC\RAMCO\Master\Customer*.qvd;
+//SET pLoad = RecNo() as RN
+//		,FilePath() as FN
+//		,Text(Trim([Customer ID])) as [Customer Number]
+//
+//		,[Region] as [Region.src]
+//		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+//
+//		,[Division] as [Customer Division]
+//
+//		,0 as [OPERATING UNIT]
+//		,0 as [INDUSTRY (IN BI)]
+//		
+//		,Capitalize([Customer Name]) as [Customer Name]
+//		,[Market]
+//		,[Customer Industry]
+//		,[Customer Sub-industry]
+//		
+//		,'RAMCO' as [Customer Flag]
+//
+//		,[Customer Type]
+//		,Null() as [Customer Segment]
+//		,Null() as [Customer Group];
+//SET pFileSpec = qvd;
+
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_Customer;
+//SET pMask = BSSI Automated\BSSI Sales & Customer Master QVD\Customer Master\Customer*.qvd;
+//SET pLoad = RecNo() as RN
+//		,FilePath() as FN
+//		,Text(Trim([Customer ID])) as [Customer Number]
+//
+//		,[Region] as [Region.src]
+//		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+//
+//		,[Division] as [Customer Division]
+//		
+//		,0 as [OPERATING UNIT]
+//		
+//		,0 as [INDUSTRY (IN BI)]
+//		
+//		,Capitalize([Customer Name]) as [Customer Name]
+//		,[Market]
+//		,[Customer Industry]
+//		,[Customer Sub-industry]
+//		
+//		,'BSSI-OGI' as [Customer Flag]
+//
+//		,[Customer Type]
+//		,[Customer Segment] as [Customer Segment]
+//		,Null() as [Customer Group];
+//SET pFileSpec = qvd;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+
+SET pTable = MASTER_Customer;
+SET pMask = Master\Sandel Master\SandelMaster QVD\SandelCustomer.qvd;
+SET pLoad = RecNo() as RN
+		,FilePath() as FN
+		,Text(Trim([Customer ID])) as [Customer Number]
+
+		,[Region] as [Region.src]
+		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+
+		,[DIVISION] as [Customer Division]
+		,[OPERATING UNIT]
+		
+		,0 as [INDUSTRY (IN BI)]
+		
+		,Capitalize([Customer Name]) as [Customer Name]
+		,[Market]
+		,[Customer Industry]
+		,[Customer Sub-industry]
+		
+		,'Sandel' as [Customer Flag]
+
+		,[Customer Type]
+		,Null() as [Customer Segment]
+		,Null() as [Customer Group];
+SET pFileSpec = qvd;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+LET tSrcPath = vSrcPath;
+LET vSrcPath = vSrcPathPBCS;
+
+SET pTable = MASTER_Customer;
+SET pMask = Customer.csv;
+SET pLoad = RecNo() as RN
+		,FilePath() as FN
+		,Text(Trim([Customer ID])) as [Customer Number]
+
+		,[Region] as [Region.src]
+		,if(match([Region],$(vRegionList)),[Region],'OTHERS REGION') as [Region]
+
+		,[DIVISION] as [Customer Division]
+		,[OPERATING UNIT]
+		
+		,0 as [INDUSTRY (IN BI)]
+		
+		,Capitalize([Customer Name]) as [Customer Name]
+		,[Market]
+		,[Customer Industry]
+		,[Customer Sub-industry]
+		
+		,'PBCS' as [Customer Flag]
+
+		,[Customer Type]
+		,[Customer Segment]
+		,[Customer Group];
+SET pFileSpec = txt, utf8, embedded labels, delimiter is ',', msq;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+LET vSrcPath = tSrcPath;
+LET tSrcPath = Null();
+
+SET pTable = Global_Customer;
+SET pMask = Master\Global Customer Master\Global Customer Master.xlsx;
+SET pLoad = RecNo() as RN
+		,FilePath() as FN
+		,Text(Trim([Customer Numbers])) as [Customer Number]
+		,Capitalize([Global Customer]) as [Global Customer];
+SET pFileSpec = ooxml, embedded labels, table is [Global Customer];
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec, pCondition);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+IF not IsNull(TableNumber('MASTER_Customer')) then
+
+	IF not IsNull(TableNumber('Global_Customer')) then
+	
+		Left Join ([MASTER_Customer])
+			LOAD Distinct
+				[Customer Number]
+				,[Global Customer]
+			Resident [Global_Customer];
+		
+		CALL DropTable('Global_Customer');
+	
+	ELSE
+
+		Left Join ([MASTER_Customer])
+			LOAD Distinct
+				Null() as [Customer Number]
+				,Null() as [Global Customer]
+			AutoGenerate(0);
+	
+	ENDIF;
+
+	STORE 
+		[Customer Number]
+		,[Global Customer]
+		,[Region]
+		,[Customer Division]
+		,[OPERATING UNIT]
+		,[INDUSTRY (IN BI)]
+		,[Customer Name]
+		,[Market]
+		,[Customer Industry]
+		,[Customer Sub-industry]
+		,[Customer Flag]
+		,[Customer Type]
+		,[Customer Segment]
+		,[Customer Group]
+		,[FN]
+	from [MASTER_Customer] 
+	into '$(vQVDPath)Customer.qvd' (qvd);
+	
+	Left Join ([MASTER_Customer])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC]
+		Resident [MASTER_Customer]
+		Where 
+			Not ([Region] = [Region.src])
+			;
+
+	IF FieldValueCount('QC') > 0 then
+		
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('MASTER_Customer',cWARNING,vMessage,'Region.src'			,'Region'		,vWhere);
+		
+	ENDIF
+	
+	
+	
+	
+	/*IF FieldValueCount('QC') > 0 then
+	
+		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(not ([Region] = [Region.src]),';[Region] "'&[Region.src]&'". Replaced with "'&[Region]&'";','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('Customer',cWARNING,vMessage);
+	
+	ENDIF;
+	*/
+	CALL CheckDoubles('MASTER_Customer','Customer Number');
+	CALL LogMessage('MASTER_Customer',cSUCCESSFUL);
+	
+	CALL DropTable('MASTER_Customer');
+
+ENDIF;
+
+LET vMessage = Null();
+
+///$tab CustomerSubRegion
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = Master\Customer*.xlsx;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text(Trim([customer ID])) as [Customer Number]
+//		,[ShipToAddressID]
+//		
+//		,[customer ID]&'-'&[ShipToAddressID] as [CustomerShipToAddressID]
+//		
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State / Province] as [State]
+//		,[Country]
+//		
+//		,'0' as [Territory_Code]
+//		,'NA-LAC' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,Pick(Match(Trim([Sub-region]),'Russia','CIS','India & Subco')+1
+//				,[Sub-region]
+//				,'Russia & CIS'
+//				,'Russia & CIS'
+//				,'IND')
+//			) as [Sub-region]
+//		,Text([Sub-region]) as [Sub-region.src]
+//		
+//		,Null() as [EMEA Sub region]
+//		,Null() as [EMEA Sub region.src];
+//SET pFileSpec = ooxml, embedded labels, table is ShipToAddress;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = Master\Sandel Master\SandelMaster QVD\SandelShipToMaster.qvd;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text([CustomerID]) as [Customer Number]
+//		,[ShipToAddressID]
+//		,[Cust-ShipTo] as [CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[StateProvince] as [State]
+//		,[Country]
+//		
+//		,'0' as [Territory_Code]
+//		,'Sandel' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub Region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[Sub Region]
+//			) as [Sub-region]
+//		,Text([Sub Region]) as [Sub-region.src]
+//		
+//		,Null() as [EMEA Sub region]
+//		,Null() as [EMEA Sub region.src];
+//SET pFileSpec = qvd;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = BSSI Automated\BSSI Sales & Customer Master QVD\Customer Master\Shipto_Master*.qvd;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text([Customer ID]) as [Customer Number]
+//		,[ShipToAddressID]
+//		
+//		,[Customer ID]&'-'&[ShipToAddressID] as [CustomerShipToAddressID]
+//		
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State/Province] as [State]
+//		,[Country]
+//		,Text([Territory Code]) as [Territory_Code]
+//		
+//		,'BSSI-OGI' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-Region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[Sub-Region]
+//			) as [Sub-region]
+//		,Text([Sub-Region]) as [Sub-region.src]
+//		
+//		,Null() as [EMEA Sub region]
+//		,Null() as [EMEA Sub region.src];
+//SET pFileSpec = qvd;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = APAC\APAC Masters\Customer*.xlsx;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text([Customer ID]) as [Customer Number]
+//		,[ShipToAddressID]
+//		,[Cust-Shipto] as CustomerShipToAddressID
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State / Province] as [State]
+//		,[Country]
+//		,Text([Territory Code]) as [Territory_Code]
+//		
+//		,'MIDAS' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[Sub-region]
+//			) as [Sub-region]
+//		,Text([Sub-region]) as [Sub-region.src]
+//		
+//		,Null() as [EMEA Sub region]
+//		,Null() as [EMEA Sub region.src];
+//SET pFileSpec = ooxml, embedded labels, table is ShipToAddress;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = EMEA Datausing in GIS\EMEA Master\Customer*.xlsx;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,[Customer ID] as [Customer Number]
+//		,[ShipToAddressID]
+//		,[Cust-Shipto] as [CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State / Province] as [State]
+//		,[Country]
+//		,Text([Territory Code]) as [Territory_Code]
+//		
+//		,'EMEA' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,Pick(Match(Trim([Sub-region]),'Russia','CIS','India & Subco','UK')+1
+//				,[Sub-region]
+//				,'Russia & CIS'
+//				,'Russia & CIS'
+//				,'IND'
+//				,if(WildMatch([Customer ID],'AMGL*'),'UK-Eire',[Sub-region]))
+//			) as [Sub-region]
+//		,Text([Sub-region]) as [Sub-region.src]
+//		
+//		,Null() as [EMEA Sub region]
+//		,Null() as [EMEA Sub region.src];
+//SET pFileSpec = ooxml, embedded labels, table is ShipToAddress;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = APAC\RAMCO\Master\ShipTo*.qvd;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text([Customer ID]) as [Customer Number]
+//		,[ShipToAddressID]
+//		,[Cust-Shipto] as [CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State / Province] as [State]
+//		,[Country]
+//		,Text([Territory Code]) as [Territory_Code]
+//		
+//		,'RAMCO' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[Sub-region]
+//			) as [Sub-region]
+//		,Text([Sub-region]) as [Sub-region.src]
+//		
+//		,Null() as [EMEA Sub region]
+//		,Null() as [EMEA Sub region.src];
+//SET pFileSpec = qvd;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = APS\Masters\Customer*.xlsx;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text([Customer ID]) as [Customer Number]
+//		,[ShipToAddressID]
+//		,[Cust-Shipto] as [CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State / Province] as [State]
+//		,[Country]
+//		,Text([Territory Code]) as [Territory_Code]
+//		
+//		,'APS' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,Pick(Match(Trim([Sub-region]),'Russia','CIS','India & Subco')+1
+//				,[Sub-region]
+//				,'Russia & CIS'
+//				,'Russia & CIS'
+//				,'IND')
+//			) as [Sub-region]
+//		,Text([Sub-region]) as [Sub-region.src]
+//		
+//		,Null() as [EMEA Sub region]
+//		,Null() as [EMEA Sub region.src];
+//SET pFileSpec = ooxml, embedded labels, table is ShipToAddress;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = Microgard\Microgard Customer Master\Customer*.xlsx;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text(Trim([Customer ID])) as [Customer Number]
+//		,[ShipToAddressID]
+//		,[Cust-Shipto] as [CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State / Province] as [State]
+//		,[Country]
+//		,Text([Territory Code]) as [Territory_Code]
+//		
+//		,'Microgard' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[Sub-region]
+//			) as [Sub-region]
+//		,Text([Sub-region]) as [Sub-region.src]
+//		
+//		,Null() as [EMEA Sub region]
+//		,Null() as [EMEA Sub region.src];
+//SET pFileSpec = ooxml, embedded labels, table is CustomerShipto;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = EMEA Datausing in GIS\SAP Master\CustomerSubRegion*.qvd;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text(Trim([Customer ID])) as [Customer Number]
+//		,[ShipToAddressID]
+//		,[CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State]
+//		,[Country]
+//		,Text([Territory_Code]) as [Territory_Code]
+//		
+//		,'SAP' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([SubRegion],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[SubRegion]
+//			) as [Sub-region]
+//		,Text([SubRegion]) as [Sub-region.src]
+//		,if(
+//			Alt(Len(Purgechar([EMEA Sub region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[EMEA Sub region]
+//			) as [EMEA Sub region]
+//		,Text([EMEA Sub region]) as [EMEA Sub region.src];
+//SET pFileSpec = qvd;
+//SET pCondition = WildMatch([Customer ID], 'SAP-*');
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null(); 
+//LET pCondition 	= Null();
+//
+//IF not IsNull(TableNumber('MASTER_CustomerSubRegion')) then
+//
+//	STORE 
+//		[Customer Number]
+//		,[ShipToAddressID]
+//		,[CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State]
+//		,[Country]
+//		,[Territory_Code]
+//		,[CustomerSubRegion Flag]
+//		,[Sub-region]
+//		,[EMEA Sub region]
+//		,[FN]
+//	from [MASTER_CustomerSubRegion] 
+//	into '$(vQVDPath)CustomerSubRegion.qvd' (qvd);
+//	
+//	Left Join ([MASTER_CustomerSubRegion])
+//		LOAD Distinct
+//			[RN]
+//			,[FN]
+//			,1 as [QC]
+//		Resident [MASTER_CustomerSubRegion]
+//		Where 
+//			Not ([Sub-region] = [Sub-region.src])
+//			;
+//	
+//	IF FieldValueCount('QC') > 0 then
+//		
+//		SET vWhere = and QC <> 0;
+//		CALL LogMessage('MASTER_CustomerSubRegion',cWARNING,vMessage,'Sub-region.src'			,'Sub-region'		,vWhere);
+//		
+//	ENDIF
+//	
+//
+//	/*
+//	IF FieldValueCount('QC') > 0 then
+//	
+//		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+//			&replace(
+//				replace(
+//					';;'
+//					&if(not ([Sub-region] = [Sub-region.src]),';[Sub-region] "'&[Sub-region.src]&'". Replaced with "'&[Sub-region]&'";','')
+//					&';;'
+//					,';;;'
+//					,'')
+//				,';;'
+//				,chr(10)&chr(13))
+//			;
+//		CALL LogMessage('CustomerSubRegion',cWARNING,vMessage);
+//	
+//	ENDIF;
+//	*/
+//
+//	CALL CheckDoubles('MASTER_CustomerSubRegion','CustomerShipToAddressID');
+//	CALL LogMessage('MASTER_CustomerSubRegion',cSUCCESSFUL);
+//	
+//	CALL DropTable('MASTER_CustomerSubRegion');
+//
+//ENDIF;
+//
+//LET vMessage = Null();
+///$tab CustomerSubRegion New
+SET pTable = MASTER_CustomerSubRegion;
+SET pMask = Customer Master\Customer Master*.xlsx;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		,Text(Trim([Customer ID])) as [Customer Number]
+		,[ShipToAddressID]
+		
+		,[Cust-Shipto] as [CustomerShipToAddressID]
+		
+		,[AddressLine1] as [Ship to Name]
+		,[AddressLine2] as [Ship to Address]
+		
+		,[City]
+		,[StateProvinceID]
+		,[PostalCode]
+		,[State / Province] as [State]
+		,[Country]
+		
+		,[Territory Code] as [Territory_Code]
+		,'NA-LAC' as [CustomerSubRegion Flag]
+		
+		,if(
+			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+			,'0'
+			,Pick(Match(Trim([Sub-region])
+//					,'Russia'
+//					,'CIS'
+					,'India & Subco')+1
+				,[Sub-region]
+//				,'Russia & CIS'
+//				,'Russia & CIS'
+				,'IND')
+			) as [Sub-region]
+		,Text([Sub-region]) as [Sub-region.src]
+
+		,Null() as [EMEA Sub region]
+		,Null() as [EMEA Sub region.src]
+		,Null() as [CustomerDivision];
+		;
+SET pFileSpec = ooxml, embedded labels, table is ShiptoAddress;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+SET pTable = MASTER_CustomerSubRegion;
+SET pMask = Customer Master\NA_LAC\Customer MASTER*.xlsx;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		,Text(Trim([Customer ID])) as [Customer Number]
+		,[ShipToAddressID]
+		
+		,[Cust-Shipto] as [CustomerShipToAddressID]
+		
+		,[AddressLine1] as [Ship to Name]
+		,[AddressLine2] as [Ship to Address]
+		
+		,[City]
+		,[StateProvinceID]
+		,[PostalCode]
+		,[State / Province] as [State]
+		,[Country]
+		
+		,[Territory Code] as [Territory_Code]
+		,'NA-LAC' as [CustomerSubRegion Flag]
+		
+		,if(
+			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+			,'0'
+			,Pick(Match(Trim([Sub-region])
+//					,'Russia'
+//					,'CIS'
+					,'India & Subco')+1
+				,[Sub-region]
+//				,'Russia & CIS'
+//				,'Russia & CIS'
+				,'IND')
+			) as [Sub-region]
+		,Text([Sub-region]) as [Sub-region.src]
+
+		,Null() as [EMEA Sub region]
+		,Null() as [EMEA Sub region.src]
+		,Null() as [CustomerDivision]
+		;
+SET pFileSpec = ooxml, embedded labels, table is ShiptoAddress;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+SET pTable = MASTER_CustomerSubRegion;
+SET pMask = EMEA Datausing in GIS\SAP Master2\CustomerSubRegion*.qvd;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		,Text(Trim([Customer ID])) as [Customer Number]
+		,[ShipToAddressID]
+		,[CustomerShipToAddressID]
+		
+		,[AddressLine1] as [Ship to Name]
+		,[AddressLine2] as [Ship to Address]
+		
+		,[City]
+		,[StateProvinceID]
+		,[PostalCode]
+		,[State]
+		,[Country]
+//		,Text([Territory_Code]) as [Territory_Code]
+		,Text([Territory Code ID]) as [Territory_Code]
+		
+		,'SAP' as [CustomerSubRegion Flag]
+		
+		,if(
+			Alt(Len(Purgechar([SubRegion],$(vPurgeChars))),0)=0
+			,'0'
+			,[SubRegion]
+			) as [Sub-region]
+		,Text([SubRegion]) as [Sub-region.src]
+		,if(
+			Alt(Len(Purgechar([EMEA Sub region],$(vPurgeChars))),0)=0
+			,'0'
+			,[EMEA Sub region]
+			) as [EMEA Sub region]
+		,Text([EMEA Sub region]) as [EMEA Sub region.src]
+		,[CustomerDivision];
+SET pFileSpec = qvd;
+SET pCondition = WildMatch([Customer ID], 'SAP-*');
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null(); 
+LET pCondition 	= Null();
+
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = APAC\RAMCO\Master\ShipTo*.qvd;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text([Customer ID]) as [Customer Number]
+//		,[ShipToAddressID]
+//		,[Cust-Shipto] as [CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State / Province] as [State]
+//		,[Country]
+//		,Text([Territory Code]) as [Territory_Code]
+//		
+//		,'RAMCO' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[Sub-region]
+//			) as [Sub-region]
+//		,Text([Sub-region]) as [Sub-region.src]
+//		
+//		,Null() as [EMEA Sub region]
+//		,Null() as [EMEA Sub region.src]
+//		,Null() as [CustomerDivision];
+//SET pFileSpec = qvd;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null(); 
+//LET pCondition 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = BSSI Automated\BSSI Sales & Customer Master QVD\Customer Master\Shipto_Master*.qvd;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text([Customer ID]) as [Customer Number]
+//		,[ShipToAddressID]
+//		
+//		,[Customer ID]&'-'&[ShipToAddressID] as [CustomerShipToAddressID]
+//		
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State/Province] as [State]
+//		,[Country]
+//		,Text([Territory Code]) as [Territory_Code]
+//		
+//		,'BSSI-OGI' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-Region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[Sub-Region]
+//			) as [Sub-region]
+//		,Text([Sub-Region]) as [Sub-region.src]
+//		
+//		,Null() as [EMEA Sub region]
+//		,Null() as [EMEA Sub region.src]
+//		,Null() as [CustomerDivision];
+//SET pFileSpec = qvd;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+
+SET pTable = MASTER_CustomerSubRegion;
+SET pMask = Master\Sandel Master\SandelMaster QVD\SandelShipToMaster.qvd;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		,Text([CustomerID]) as [Customer Number]
+		,[ShipToAddressID]
+		
+		,Text([AddressLine1]) as [Ship to Name]
+		,Text([AddressLine2]) as [Ship to Address]
+		
+		,[Cust-ShipTo] as [CustomerShipToAddressID]
+		,[City]
+		,[StateProvinceID]
+		,[PostalCode]
+		,[StateProvince] as [State]
+		,[Country]
+		
+		,'0' as [Territory_Code]
+		,'Sandel' as [CustomerSubRegion Flag]
+		
+		,if(
+			Alt(Len(Purgechar([Sub Region],$(vPurgeChars))),0)=0
+			,'0'
+			,[Sub Region]
+			) as [Sub-region]
+		,Text([Sub Region]) as [Sub-region.src]
+		
+		,Null() as [EMEA Sub region]
+		,Null() as [EMEA Sub region.src]
+		,Null() as [CustomerDivision];
+SET pFileSpec = qvd;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+LET tSrcPath = vSrcPath;
+LET vSrcPath = vSrcPathPBCS;
+
+SET pTable = MASTER_CustomerSubRegion;
+SET pMask = ShipToAddress.csv;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		,Text(trim([Customer ID])) as [Customer Number]
+		,[ShipToAddressID]
+		
+		,Text([AddressLine1]) as [Ship to Name]
+		,Text([AddressLine2]) as [Ship to Address]
+		
+		,Text(trim([Customer ID])) &'-' & Text(trim([ShipToAddressID])) as [CustomerShipToAddressID]
+		,[City]
+		,[StateProvinceID]
+		,[PostalCode]
+		,[State / Province] as [State]
+		,[Country]
+		
+		,[Territory Code] as [Territory_Code]
+		,'PBCS' as [CustomerSubRegion Flag]
+		
+		,if(
+			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+			,'0'
+			,[Sub-region]
+			) as [Sub-region]
+		,Text([Sub-region]) as [Sub-region.src]
+		
+		,Null() as [EMEA Sub region]
+		,Null() as [EMEA Sub region.src]
+		,Null() as [CustomerDivision];
+SET pFileSpec =  txt, utf8, embedded labels, delimiter is ',', msq;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+LET vSrcPath = tSrcPath;
+LET tSrcPath = Null();
+
+IF not IsNull(TableNumber('MASTER_CustomerSubRegion')) then
+
+	STORE 
+		[Customer Number]
+		,[ShipToAddressID]
+		
+		,[Ship to Name]
+		,[Ship to Address]
+		
+		,[CustomerShipToAddressID]
+		,[City]
+		,[StateProvinceID]
+		,[PostalCode]
+		,[State]
+		,[Country]
+		,[Territory_Code]
+		,[CustomerSubRegion Flag]
+		,[Sub-region]
+		,[FN]
+		
+		,[EMEA Sub region]
+		,[CustomerDivision]
+	from [MASTER_CustomerSubRegion] 
+	into '$(vQVDPath)CustomerSubRegion.qvd' (qvd);
+	
+	Left Join ([MASTER_CustomerSubRegion])
+		LOAD Distinct
+			[RN]
+			,[FN]
+			,1 as [QC]
+		Resident [MASTER_CustomerSubRegion]
+		Where 
+			Not ([Sub-region] = [Sub-region.src])
+			;
+	
+	IF FieldValueCount('QC') > 0 then
+		
+		SET vWhere = and QC <> 0;
+		CALL LogMessage('MASTER_CustomerSubRegion',cWARNING,vMessage,'Sub-region.src'			,'Sub-region'		,vWhere);
+		
+	ENDIF
+	
+
+	/*
+	IF FieldValueCount('QC') > 0 then
+	
+		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+			&replace(
+				replace(
+					';;'
+					&if(not ([Sub-region] = [Sub-region.src]),';[Sub-region] "'&[Sub-region.src]&'". Replaced with "'&[Sub-region]&'";','')
+					&';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&chr(13))
+			;
+		CALL LogMessage('CustomerSubRegion',cWARNING,vMessage);
+	
+	ENDIF;
+	*/
+
+	CALL CheckDoubles('MASTER_CustomerSubRegion','CustomerShipToAddressID');
+	CALL LogMessage('MASTER_CustomerSubRegion',cSUCCESSFUL);
+	
+	CALL DropTable('MASTER_CustomerSubRegion');
+
+ENDIF;
+
+LET vMessage = Null();
+///$tab CustomerSubRegion Backup 20170915
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = Master\Customer*.xlsx;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text(Trim([customer ID])) as [Customer Number]
+//		,[ShipToAddressID]
+//		
+//		,[customer ID]&'-'&[ShipToAddressID] as [CustomerShipToAddressID]
+//		
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State / Province] as [State]
+//		,[Country]
+//		
+//		,'0' as [Territory_Code]
+//		,'NA-LAC' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,Pick(Match(Trim([Sub-region]),'Russia','CIS','India & Subco')+1
+//				,[Sub-region]
+//				,'Russia & CIS'
+//				,'Russia & CIS'
+//				,'IND')
+//			) as [Sub-region]
+//		,Text([Sub-region]) as [Sub-region.src];
+//SET pFileSpec = ooxml, embedded labels, table is ShipToAddress;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = Master\Sandel Master\SandelMaster QVD\SandelShipToMaster.qvd;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text([CustomerID]) as [Customer Number]
+//		,[ShipToAddressID]
+//		,[Cust-ShipTo] as [CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[StateProvince] as [State]
+//		,[Country]
+//		
+//		,'0' as [Territory_Code]
+//		,'Sandel' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub Region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[Sub Region]
+//			) as [Sub-region]
+//		,Text([Sub Region]) as [Sub-region.src];
+//SET pFileSpec = qvd;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = BSSI Automated\BSSI Sales & Customer Master QVD\Customer Master\Shipto_Master*.qvd;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text([Customer ID]) as [Customer Number]
+//		,[ShipToAddressID]
+//		
+//		,[Customer ID]&'-'&[ShipToAddressID] as [CustomerShipToAddressID]
+//		
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State/Province] as [State]
+//		,[Country]
+//		,Text([Territory Code]) as [Territory_Code]
+//		
+//		,'BSSI-OGI' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-Region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[Sub-Region]
+//			) as [Sub-region]
+//		,Text([Sub-Region]) as [Sub-region.src];
+//SET pFileSpec = qvd;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = APAC\APAC Masters\Customer*.xlsx;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text([Customer ID]) as [Customer Number]
+//		,[ShipToAddressID]
+//		,[Cust-Shipto] as CustomerShipToAddressID
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State / Province] as [State]
+//		,[Country]
+//		,Text([Territory Code]) as [Territory_Code]
+//		
+//		,'MIDAS' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[Sub-region]
+//			) as [Sub-region]
+//		,Text([Sub-region]) as [Sub-region.src];
+//SET pFileSpec = ooxml, embedded labels, table is ShipToAddress;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = EMEA Datausing in GIS\EMEA Master\Customer*.xlsx;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,[Customer ID] as [Customer Number]
+//		,[ShipToAddressID]
+//		,[Cust-Shipto] as [CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State / Province] as [State]
+//		,[Country]
+//		,Text([Territory Code]) as [Territory_Code]
+//		
+//		,'EMEA' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,Pick(Match(Trim([Sub-region]),'Russia','CIS','India & Subco','UK')+1
+//				,[Sub-region]
+//				,'Russia & CIS'
+//				,'Russia & CIS'
+//				,'IND'
+//				,if(WildMatch([Customer ID],'AMGL*'),'UK-Eire',[Sub-region]))
+//			) as [Sub-region]
+//		,Text([Sub-region]) as [Sub-region.src];
+//SET pFileSpec = ooxml, embedded labels, table is ShipToAddress;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = APAC\RAMCO\Master\ShipTo*.qvd;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text([Customer ID]) as [Customer Number]
+//		,[ShipToAddressID]
+//		,[Cust-Shipto] as [CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State / Province] as [State]
+//		,[Country]
+//		,Text([Territory Code]) as [Territory_Code]
+//		
+//		,'RAMCO' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[Sub-region]
+//			) as [Sub-region]
+//		,Text([Sub-region]) as [Sub-region.src];
+//SET pFileSpec = qvd;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = APS\Masters\Customer*.xlsx;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text([Customer ID]) as [Customer Number]
+//		,[ShipToAddressID]
+//		,[Cust-Shipto] as [CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State / Province] as [State]
+//		,[Country]
+//		,Text([Territory Code]) as [Territory_Code]
+//		
+//		,'APS' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,Pick(Match(Trim([Sub-region]),'Russia','CIS','India & Subco')+1
+//				,[Sub-region]
+//				,'Russia & CIS'
+//				,'Russia & CIS'
+//				,'IND')
+//			) as [Sub-region]
+//		,Text([Sub-region]) as [Sub-region.src];
+//SET pFileSpec = ooxml, embedded labels, table is ShipToAddress;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = Microgard\Microgard Customer Master\Customer*.xlsx;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text(Trim([Customer ID])) as [Customer Number]
+//		,[ShipToAddressID]
+//		,[Cust-Shipto] as [CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State / Province] as [State]
+//		,[Country]
+//		,Text([Territory Code]) as [Territory_Code]
+//		
+//		,'Microgard' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([Sub-region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[Sub-region]
+//			) as [Sub-region]
+//		,Text([Sub-region]) as [Sub-region.src];
+//SET pFileSpec = ooxml, embedded labels, table is CustomerShipto;
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null();
+//
+//SET pTable = MASTER_CustomerSubRegion;
+//SET pMask = EMEA Datausing in GIS\SAP Master\CustomerSubRegion*.qvd;
+//SET pLoad = RecNo() as [RN]
+//		,FilePath() as [FN]
+//		,Text(Trim([Customer ID])) as [Customer Number]
+//		,[ShipToAddressID]
+//		,[CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State]
+//		,[Country]
+//		,Text([Territory_Code]) as [Territory_Code]
+//		
+//		,'SAP' as [CustomerSubRegion Flag]
+//		
+//		,if(
+//			Alt(Len(Purgechar([EMEA Sub region],$(vPurgeChars))),0)=0
+//			,'0'
+//			,[EMEA Sub region]
+//			) as [Sub-region]
+//		,Text([EMEA Sub region]) as [Sub-region.src];
+//SET pFileSpec = qvd;
+//SET pCondition = WildMatch([Customer ID], 'SAP-*');
+//
+//CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+//LET pTable 		= Null(); 
+//LET pMask 		= Null(); 
+//LET pLoad 		= Null(); 
+//LET pFileSpec 	= Null(); 
+//LET pCondition 	= Null();
+//
+//IF not IsNull(TableNumber('MASTER_CustomerSubRegion')) then
+//
+//	STORE 
+//		[Customer Number]
+//		,[ShipToAddressID]
+//		,[CustomerShipToAddressID]
+//		,[City]
+//		,[StateProvinceID]
+//		,[PostalCode]
+//		,[State]
+//		,[Country]
+//		,[Territory_Code]
+//		,[CustomerSubRegion Flag]
+//		,[Sub-region]
+//		,[FN]
+//	from [MASTER_CustomerSubRegion] 
+//	into '$(vQVDPath)CustomerSubRegion.qvd' (qvd);
+//	
+//	Left Join ([MASTER_CustomerSubRegion])
+//		LOAD Distinct
+//			[RN]
+//			,[FN]
+//			,1 as [QC]
+//		Resident [MASTER_CustomerSubRegion]
+//		Where 
+//			Not ([Sub-region] = [Sub-region.src])
+//			;
+//	
+//	IF FieldValueCount('QC') > 0 then
+//		
+//		SET vWhere = and QC <> 0;
+//		CALL LogMessage('MASTER_CustomerSubRegion',cWARNING,vMessage,'Sub-region.src'			,'Sub-region'		,vWhere);
+//		
+//	ENDIF
+//	
+//
+//	/*
+//	IF FieldValueCount('QC') > 0 then
+//	
+//		SET vMessage = 'Line #'&[RN]&' in ['&[FN]&'] has:'&chr(10)&chr(13)
+//			&replace(
+//				replace(
+//					';;'
+//					&if(not ([Sub-region] = [Sub-region.src]),';[Sub-region] "'&[Sub-region.src]&'". Replaced with "'&[Sub-region]&'";','')
+//					&';;'
+//					,';;;'
+//					,'')
+//				,';;'
+//				,chr(10)&chr(13))
+//			;
+//		CALL LogMessage('CustomerSubRegion',cWARNING,vMessage);
+//	
+//	ENDIF;
+//	*/
+//
+//	CALL CheckDoubles('MASTER_CustomerSubRegion','CustomerShipToAddressID');
+//	CALL LogMessage('MASTER_CustomerSubRegion',cSUCCESSFUL);
+//	
+//	CALL DropTable('MASTER_CustomerSubRegion');
+//
+//ENDIF;
+//
+//LET vMessage = Null();
+///$tab Territory
+SET pTable = MASTER_Territory;
+SET pMask = EMEA Datausing in GIS\EMEA Master\Customer*.xlsx;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		,Text([Sales Manager ID]) as [Territory_Code]
+		,[Sales Manager Name] as [Sales_Manager]
+		,[EMEA Sub region]
+		,[Regional Manager]
+		,Null() as [Territory Name];
+SET pFileSpec = ooxml, embedded labels, table is [Sales Manager];
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+SET pTable = MASTER_Territory;
+SET pMask = Customer Master\Customer*.xlsx;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		,Text([Territory Code ID]) as [Territory_Code]
+		,[Territory Manager] as [Sales_Manager]
+		,[EMEA Sub region]
+		,[Regional Manager]
+		,[Territory Name];
+SET pFileSpec = ooxml, embedded labels, table is [Sales Manager];
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+SET pTable = MASTER_Territory;
+SET pMask = Customer Master\NA_LAC\Customer MASTER*.xlsx;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		,Text([Territory Code ID]) as [Territory_Code]
+		,[Territory Manager] as [Sales_Manager]
+		,[EMEA Sub region]
+		,[Regional Manager]
+		,[Territory Name];
+SET pFileSpec = ooxml, embedded labels, table is [Sales Manager];
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+SET pTable = MASTER_Territory;
+SET pMask = EMEA Datausing in GIS\SAP Master2\CustomerSubRegion*.qvd;
+LET pLoad = 'RowNo() as [RN]
+		,FilePath() as [FN]
+		,Text([Territory Code ID]) as [Territory_Code]
+		,[Territory Manager] as [Sales_Manager]
+		,[EMEA Sub region]
+		,[Regional Manager]
+		,[Territory Name];
+		LOAD Distinct
+			FilePath() as [FN]
+			,[Territory Code ID]
+			,[Territory Manager]
+			,[EMEA Sub region]
+			,[Regional Manager]
+			,[Territory Name]';
+SET pFileSpec = qvd;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+IF not IsNull(TableNumber('MASTER_Territory')) then
+	
+	LET vFile = Null();
+	
+	STORE 
+		[Territory_Code]
+		,[Sales_Manager]
+		,[EMEA Sub region] 
+		,[Regional Manager]
+		,[Territory Name]
+		,[FN]
+	from [MASTER_Territory] 
+	into '$(vQVDPath)Territory.qvd' (qvd);
+	
+	CALL LogMessage('MASTER_Territory',cSUCCESSFUL);
+	
+	CALL DropTable('MASTER_Territory');
+
+ENDIF;
+
+LET vMessage = Null();
+///$tab Calendar
+SET pTable 	= MASTER_Calendar;
+SET pMask 	= Master\Monthly Calendar for Default.xlsx;
+SET pLoad 	= RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,[DATE]
+		,Num([DATE]) as [Date]
+		,[DAYS]
+		,Num([DAYS]) as [fWDay]
+		,'Default' as [WRegion]
+		;
+SET pFileSpec = ooxml, embedded labels, table is Default;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+SET pTable	= MASTER_Calendar;
+SET pMask 	= Master\Monthly Calendar for APAC.xlsx;
+SET pLoad 	= RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,[DATE]
+		,Num([DATE]) as [Date]
+		,[DAYS]
+		,Num([DAYS]) as [fWDay]
+		,'APAC' as [WRegion]
+		;
+SET pFileSpec = ooxml, embedded labels, table is APAC;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+SET pTable = MASTER_Calendar;
+SET pMask = Master\Monthly Calendar for EMEA.xlsx;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,[DATE]
+		,Num([DATE]) as [Date]
+		,[DAYS]
+		,Num([DAYS]) as [fWDay]
+		,'EMEA' as [WRegion]
+		;
+SET pFileSpec = ooxml, embedded labels, table is EMEA;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+SET pTable = MASTER_Calendar;
+SET pMask = Master\Monthly Calendar for LAC.xlsx;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,[DATE]
+		,Num([DATE]) as [Date]
+		,[DAYS]
+		,Num([DAYS]) as [fWDay]
+		,'LAC' as [WRegion]
+		;
+SET pFileSpec = ooxml, embedded labels, table is LAC;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+SET pTable = MASTER_Calendar;
+SET pMask = Master\Monthly Calendar for NA.xlsx;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		
+		,[DATE]
+		,Num([DATE]) as [Date]
+		,[DAYS]
+		,Num([DAYS]) as [fWDay]
+		,'NA' as [WRegion]
+		;
+SET pFileSpec = ooxml, embedded labels, table is NA;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+IF not IsNull(TableNumber('MASTER_Calendar')) then
+
+	LET vFile = Null();
+	
+	STORE 
+		[RN]
+		,[FN]
+		,[Date]
+		,[fWDay] 
+		,[WRegion]
+	from [MASTER_Calendar] 
+	into '$(vQVDPath)Calendar.qvd' (qvd);
+	
+	CALL LogMessage('MASTER_Calendar',cSUCCESSFUL);
+	
+	CALL DropTable('MASTER_Calendar');
+
+ENDIF;
+
+LET vMessage = Null();
+///$tab Market Type
+/*
+
+SET pTable = MASTER_MarketType;
+SET pMask = Validation\EMEA Reporting region2\Region Customer Mapping Structure - F16.xlsx;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		,[Market Type]
+		,[Region]
+		,if(
+			Alt(Len(Purgechar([SubRegion],$(vPurgeChars))),0)=0
+			,'0'
+			,pick(match(Trim([SubRegion])
+//					,'Russia'
+//					,'CIS'
+					,'Indian Subco')+1
+				,Trim([SubRegion])
+//				,'Russia & CIS'
+//			    ,'Russia & CIS'
+			    ,'IND')) as [Sub-region]
+		,[GBU]
+		,[REGION2];
+SET pFileSpec = ooxml, embedded labels, table is UPDATE3;
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+IF not IsNull(TableNumber('MASTER_MarketType')) then
+	
+	LET vFile = Null();
+	
+	STORE 
+		[RN]
+		,[FN]
+		,[Market Type]
+		,[Region]
+		,[Sub-region]
+		,[GBU]
+		,[REGION2]
+	from [MASTER_MarketType] 
+	into '$(vQVDPath)MarketType.qvd' (qvd);
+	
+	CALL LogMessage('MASTER_MarketType',cSUCCESSFUL);
+	
+	CALL DropTable('MASTER_MarketType');
+
+ENDIF;
+
+LET vMessage = Null();
+
+*/
+///$tab REGION2
+SET pTable = MASTER_Region2;
+SET pMask = Validation\EMEA Reporting region2\Corporate Subregion Mapping.xlsx;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		,[Region]
+		,if(
+			Alt(Len(Purgechar([SubRegion],$(vPurgeChars))),0)=0
+			,'0'
+			,pick(match(Trim([SubRegion])
+//					,'Russia'
+//					,'CIS'
+					,'Indian Subco')+1
+				,Trim([SubRegion])
+//				,'Russia & CIS'
+//			    ,'Russia & CIS'
+			    ,'IND')) as [Sub-region]
+		,[GBU]
+		,[REGION2];
+SET pFileSpec = ooxml, embedded labels, table is Sheet2;
+
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+IF not IsNull(TableNumber('MASTER_Region2')) then
+	
+	LET vFile = Null();
+	
+	STORE 
+		[RN]
+		,[FN]
+		,[Region]
+		,[Sub-region]
+		,[GBU]
+		,[REGION2]
+	from [MASTER_Region2] 
+	into '$(vQVDPath)REGION2.qvd' (qvd);
+	
+	CALL LogMessage('MASTER_Region2',cSUCCESSFUL);
+	
+	CALL DropTable('MASTER_Region2');
+
+ENDIF;
+
+LET vMessage = Null();
+///$tab New Market Type
+SET pTable = MASTER_MarketType;
+SET pMask = Validation\EMEA Reporting region2\Corporate Subregion Mapping.xlsx;
+SET pLoad = RecNo() as [RN]
+		,FilePath() as [FN]
+		,[Market Type]
+		,[Region]
+		,if(
+			Alt(Len(Purgechar([SubRegion],$(vPurgeChars))),0)=0
+			,'0'
+			,pick(match(Trim([SubRegion])
+//					,'Russia'
+//					,'CIS'
+					,'Indian Subco')+1
+				,Trim([SubRegion])
+//				,'Russia & CIS'
+//			    ,'Russia & CIS'
+			    ,'IND')) as [Sub-region]
+		,[Corporate Subregion] as [Corporate Sub Region]
+		,[COUNTRY] as [Country];
+SET pFileSpec = ooxml, embedded labels, table is Sheet1;
+
+
+CALL MaskLoad(pTable, pMask, pLoad, pFileSpec);
+LET pTable 		= Null(); 
+LET pMask 		= Null(); 
+LET pLoad 		= Null(); 
+LET pFileSpec 	= Null();
+
+IF not IsNull(TableNumber('MASTER_MarketType')) then
+	
+	LET vFile = Null();
+	
+	STORE 
+		[RN]
+		,[FN]
+		,[Market Type]
+		,[Region]
+		,[Sub-region]
+		,[Corporate Sub Region]
+		,[Country]
+	from [MASTER_MarketType] 
+	into '$(vQVDPath)MarketType.qvd' (qvd);
+	
+	CALL LogMessage('MASTER_MarketType',cSUCCESSFUL);
+	
+	CALL DropTable('MASTER_MarketType');
+
+ENDIF;
+
+LET vMessage = Null();
+///$tab Logs
+
+CALL DelLog ('$(vLOGPath)','$(vLogDocPrefixName)',$(vLogCountSaveLoad))
+
+LET vReloadTime = Timestamp(vReloadTime,'YYYYMMDDhhmmss');
+
+LOG:
+LOAD
+	RecNo() as [LOG.RN]
+	,[Module]
+	,[ReloadTime]
+	,[TABLE]
+	,[STATUS]
+	,IF(STATUS = 'WARNING','Line #'&([REC_NO])&' in field ['&[MESSAGE]&'] data was replaced from value "'&FromValue&'" to value "'&ToValue&'"
+	Source file: "'&FN&'"', MESSAGE)	as MESSAGE
+	,REC_NO
+    ,FromValue
+    ,ToValue
+	,if([STATUS] = 'WARNING ON DOUBLES'
+		,'DOUBLES'
+		,TextBetween([MESSAGE],'[',']',1)) as [FILENAME],
+	FN									as [File name]
+FROM
+[$(vLOGPath)$(vLogDocPrefixName)*$(vReloadTime).qvd]
+(qvd)
+//Where Upper([Module]) = Upper(DocumentPath())
+;
+	
+	[Log_Error]:
+	LOAD 	Module,
+			STATUS,
+			//TABLE,
+			COUNT(REC_NO) as QtyWorning
+	Resident LOG
+	Where STATUS <> 'FAILURE'
+	Group BY 	Module,
+				STATUS/*,
+				TABLE*/;
+	
+	IF NoOfFields('Log_Error') then	
+		STORE Log_Error into '$(vLOGPath)$(vLogTotalPrefixName)Error_$(vReloadTime).qvd' (qvd);
+		
+		DROP Table Log_Error;
+	ENDIF	
+
+	CALL DelLog ('$(vLOGPath)','$(vLogDocPrefixName)',$(vLogCountSaveLoad))
+	
+		[Log_FAILURE]:
+		NoConcatenate LOAD 	*
+		Resident LOG
+		Where STATUS = 'FAILURE';
+	
+	IF NoOfFields('Log_FAILURE') then	
+		STORE Log_FAILURE into '$(vLOGPath)$(vLogTotalPrefixName)FAILURE_$(vReloadTime).qvd' (qvd);
+		
+		DROP Table Log_FAILURE;
+	ENDIF	
+
+	CALL DelLog ('$(vLOGPath)','$(vLogTotalPrefixName)',$(vLogCountSaveLoad))
+///$tab Mail
+//CALL FailuresInTransformMessage('');
+
+LET vGL_MaskList = NULL();
+
+Exit SCRIPT;

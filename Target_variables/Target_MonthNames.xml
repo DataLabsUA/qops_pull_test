@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>MonthNames</Name>
+    <Content>Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec</Content>
+  </Variable>
+</Variables>

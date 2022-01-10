@@ -1,0 +1,16 @@
+<Variables>
+  <Variable>
+    <Name>vMessage</Name>
+    <Content>'Line #'&amp;([RN]+1)&amp;' in ['&amp;[FN]&amp;'] with RateCode-RateMonth "'&amp;[RateCode-RateMonth]&amp;'" has:'&amp;chr(10)&amp;chr(13)
+			&amp;replace(
+				replace(
+					';;'
+					&amp;if(Alt([FxBasicCurrencyRate],0)&lt;=0,';[ExchangeRate] "'&amp;[FxBasicCurrencyRate]&amp;'". Should be positive number.;','')
+					&amp;';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&amp;chr(13))
+			</Content>
+  </Variable>
+</Variables>

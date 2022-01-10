@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vML_Table</Name>
+    <Content>Concatenate([Sales_Transaction_Colombia])</Content>
+  </Variable>
+</Variables>

@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>p_FileMask</Name>
+    <Content>\\ansqlik4\QlikviewAuto\SalesMargin\HFM\HFM Data *.xlsx</Content>
+  </Variable>
+</Variables>

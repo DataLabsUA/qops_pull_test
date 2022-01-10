@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>TimeFormat</Name>
+    <Content>hh:mm:ss</Content>
+  </Variable>
+</Variables>

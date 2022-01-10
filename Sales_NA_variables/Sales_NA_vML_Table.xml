@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vML_Table</Name>
+    <Content>Concatenate([Sales_NA_PAM])</Content>
+  </Variable>
+</Variables>

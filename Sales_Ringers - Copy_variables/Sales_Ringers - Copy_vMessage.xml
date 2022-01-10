@@ -1,0 +1,33 @@
+<Variables>
+  <Variable>
+    <Name>vMessage</Name>
+    <Content>'Line #'&amp;([RN])&amp;' in ['&amp;[FN]&amp;'] has:'&amp;chr(10)&amp;chr(13)
+			&amp;replace(
+				replace(
+					';;'
+					&amp;if(not ([Trxn Currency] 							= [FinalCurrency])							,';[Trxn Currency] "'			&amp;[Trxn Currency] 					&amp;'". Replaced with "'&amp;[FinalCurrency]&amp;'";','')
+					&amp;if(not ([COGS Trxn Currency] 						= [COGS_FinalCurrency])						,';[COGS Trxn Currency] "'		&amp;[COGS Trxn Currency]				&amp;'". Replaced with "'&amp;[COGS_FinalCurrency]&amp;'";','')
+					&amp;if(not ([Sales Quantity] 							= [Sales Qty])								,';[Sales Quantity] "'			&amp;[Sales Quantity]					&amp;'". Replaced with "'&amp;[Sales Qty]&amp;'";','')
+					&amp;if(not ([Gross Sales Amount LC] 					= [GROSS Sales Amount LC])					,';[Gross Sales Amount LC] "'	&amp;[Gross Sales Amount LC]			&amp;'". Replaced with "'&amp;[GROSS Sales Amount LC]&amp;'";','')
+					&amp;if(not ([Returns LC.src] 							= [Returns LC])								,';[Returns LC] "'				&amp;[Returns LC.src]					&amp;'". Replaced with "'&amp;[Returns LC]&amp;'";','')
+					&amp;if(not ([Sales Cost Amount LC (net see thru).src]	= [Sales Cost Amount LC (net see thru)])	,';[COGS Trxn Amount] "'		&amp;[Sales Cost Amount LC (net see thru).src]				&amp;'". Replaced with "'&amp;[Sales Cost Amount LC (net see thru)]&amp;'";','')
+					&amp;if(not ([Trxn Sales Amount.src] 					= [Trxn Sales Amount])						,';[Trxn Sales Amount] "'		&amp;[Trxn Sales Amount.src]			&amp;'". Replaced with "'&amp;[Trxn Sales Amount]&amp;'";','')
+					&amp;if(not ([COGS Trxn Amount]						 	= [Trxn COGS Amount])						,';[COGS Trxn Amount] "'		&amp;[Trxn COGS Amount]					&amp;'". Replaced with "'&amp;[Trxn COGS Amount]&amp;'";','')
+					&amp;if(not ([Settlement Discount LC.src] 				= [Settlement Discount LC])					,';[Settlement Discount LC] "'	&amp;[Settlement Discount LC.src]		&amp;'". Replaced with "'&amp;[Settlement Discount LC]&amp;'";','')
+					&amp;if(not ([Co-op Rebate LC.src]						= [Co-op Rebate LC])						,';[Co-op Rebate LC] "'			&amp;[Co-op Rebate LC.src]				&amp;'". Replaced with "'&amp;[Co-op Rebate LC]&amp;'";','')
+					&amp;if(not ([Rebates LC.src] 							= [Rebates LC])								,';[Rebates LC] "'				&amp;[Rebates LC.src]					&amp;'". Replaced with "'&amp;[Rebates LC]&amp;'";','')
+					&amp;if(not ([Volume Discount LC.src]					= [Volume Discount LC])						,';[Volume Discount LC] "'		&amp;[Volume Discount LC.src]			&amp;'". Replaced with "'&amp;[Volume Discount LC]&amp;'";','')
+					&amp;if(not ([BOGO.src]			 						= [BOGO])									,';[BOGO] "'					&amp;[BOGO.src]							&amp;'". Replaced with "'&amp;[BOGO]&amp;'";','')
+					&amp;if(not ([Slotting.src]	 							= [Slotting])								,';[Slotting] "'				&amp;[Slotting.src]						&amp;'". Replaced with "'&amp;[Slotting]&amp;'";','')
+					&amp;if(not ([TPR.src]			 						= [TPR])									,';[TPR.src] "'					&amp;[TPR.src]							&amp;'". Replaced with "'&amp;[TPR]&amp;'";','')
+					&amp;if(not ([Other.src]			 					= [Other])									,';[Other] "'					&amp;[Other.src]						&amp;'". Replaced with "'&amp;[Other]&amp;'";','')
+					&amp;if(not ([COGS Adj 1 LC.src]			 			= [COGS Adj 1 LC])							,';[COGS Adj 1 LC] "'			&amp;[COGS Adj 1 LC.src]				&amp;'". Replaced with "'&amp;[COGS Adj 1 LC]&amp;'";','')
+					&amp;if(not ([COGS Adj 2 LC.src]			 			= [COGS Adj 2 LC])							,';[COGS Adj 2 LC] "'			&amp;[COGS Adj 2 LC.src]				&amp;'". Replaced with "'&amp;[COGS Adj 2 LC]&amp;'";','')
+					&amp;';;'
+					,';;;'
+					,'')
+				,';;'
+				,chr(10)&amp;chr(13))
+			</Content>
+  </Variable>
+</Variables>

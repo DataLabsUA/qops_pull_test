@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vLogsFolder</Name>
+    <Content>.\FxRatesReloadLogs</Content>
+  </Variable>
+</Variables>

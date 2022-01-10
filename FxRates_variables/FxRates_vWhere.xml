@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vWhere</Name>
+    <Content>and QC &lt;&gt; 0 and FxBasicCurrencyRate &lt;= 0</Content>
+  </Variable>
+</Variables>

@@ -1,0 +1,441 @@
+﻿<DocInternals>
+  <AlwaysLoose>
+    <bool>false</bool>
+    <bool>false</bool>
+    <bool>false</bool>
+    <bool>false</bool>
+  </AlwaysLoose>
+  <FieldSrcTables>
+    <String>6</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>7</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>8</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>9</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>10</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>11</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>12</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>13</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>14</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>15</String>
+    <String>1</String>
+    <String>LOG</String>
+    <String>16</String>
+    <String>1</String>
+    <String>LOG</String>
+  </FieldSrcTables>
+  <TableViewData>
+    <Pos></Pos>
+    <CtlInfo>
+      <InternalView>
+        <Tables>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>323</Left>
+              <Top>190</Top>
+              <Width>100</Width>
+              <Height>100</Height>
+            </Pos>
+            <Caption>GBU</Caption>
+          </TableViewTableWinSaveInfo>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>323</Left>
+              <Top>342</Top>
+              <Width>100</Width>
+              <Height>208</Height>
+            </Pos>
+            <Caption>Product</Caption>
+          </TableViewTableWinSaveInfo>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>1230</Left>
+              <Top>357</Top>
+              <Width>100</Width>
+              <Height>226</Height>
+            </Pos>
+            <Caption>LOG</Caption>
+          </TableViewTableWinSaveInfo>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>323</Left>
+              <Top>57</Top>
+              <Width>100</Width>
+              <Height>82</Height>
+            </Pos>
+            <Caption>$Syn 1 Table</Caption>
+          </TableViewTableWinSaveInfo>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>633</Left>
+              <Top>200</Top>
+              <Width>100</Width>
+              <Height>208</Height>
+            </Pos>
+            <Caption>Sales_Shipment</Caption>
+          </TableViewTableWinSaveInfo>
+          <TableViewTableWinSaveInfo>
+            <Pos>
+              <Left>910</Left>
+              <Top>387</Top>
+              <Width>100</Width>
+              <Height>136</Height>
+            </Pos>
+            <Caption>TableCheck</Caption>
+          </TableViewTableWinSaveInfo>
+        </Tables>
+        <BroomPoints></BroomPoints>
+        <ConnectionPoints></ConnectionPoints>
+        <ZoomFactor>3FF0000000000000</ZoomFactor>
+      </InternalView>
+      <SourceView></SourceView>
+    </CtlInfo>
+    <Mode>0</Mode>
+  </TableViewData>
+  <Bookmarks></Bookmarks>
+  <SavedByVersion>12.20.20800.0</SavedByVersion>
+  <ForceBackEndMacroExecution>false</ForceBackEndMacroExecution>
+  <FieldTags>
+    <ScriptBased>
+      <FieldTagData>
+        <Tag>$hidden</Tag>
+        <FieldNames>
+          <String>$Field</String>
+          <String>$Table</String>
+          <String>$Rows</String>
+          <String>$Fields</String>
+          <String>$FieldNo</String>
+          <String>$Info</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$system</Tag>
+        <FieldNames>
+          <String>$Field</String>
+          <String>$Table</String>
+          <String>$Rows</String>
+          <String>$Fields</String>
+          <String>$FieldNo</String>
+          <String>$Info</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$ascii</Tag>
+        <FieldNames>
+          <String>f_pFTM_IgnoreFile</String>
+          <String>Module</String>
+          <String>TABLE</String>
+          <String>STATUS</String>
+          <String>MESSAGE</String>
+          <String>FN</String>
+          <String>Trxn Currency</String>
+          <String>COGS Trxn Currency</String>
+          <String>FinalCurrency</String>
+          <String>COGS_FinalCurrency</String>
+          <String>LocalCurrency</String>
+          <String>Currency</String>
+          <String>CompoundKey</String>
+          <String>Entity</String>
+          <String>Customer Number</String>
+          <String>Product Number</String>
+          <String>Orginal Invoice</String>
+          <String>Inventory Org</String>
+          <String>Invoice Number</String>
+          <String>Doc Type</String>
+          <String>U/M</String>
+          <String>Trans Type</String>
+          <String>Flag</String>
+          <String>Region</String>
+          <String>Sub-region</String>
+          <String>Country</String>
+          <String>State</String>
+          <String>CURRENCY</String>
+          <String>PRODUCT NUMBER</String>
+          <String>Customer Roll Up</String>
+          <String>SBU</String>
+          <String>Product Division</String>
+          <String>Business Division</String>
+          <String>Customer Division</String>
+          <String>GBU</String>
+          <String>BudgetInc</String>
+          <String>SI_FN</String>
+          <String>2019</String>
+          <String>2020</String>
+          <String>ForecastInc</String>
+          <String>2018</String>
+          <String>Customer Name</String>
+          <String>Customer Industry</String>
+          <String>Customer Flag</String>
+          <String>Customer Type</String>
+          <String>CustomerSubRegion Flag</String>
+          <String>File name</String>
+          <String>FILENAME</String>
+          <String>$Field</String>
+          <String>$Table</String>
+          <String>$Info</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$text</Tag>
+        <FieldNames>
+          <String>f_pFTM_IgnoreFile</String>
+          <String>Module</String>
+          <String>TABLE</String>
+          <String>STATUS</String>
+          <String>MESSAGE</String>
+          <String>FN</String>
+          <String>Trxn Currency</String>
+          <String>COGS Trxn Currency</String>
+          <String>FinalCurrency</String>
+          <String>COGS_FinalCurrency</String>
+          <String>LocalCurrency</String>
+          <String>Currency</String>
+          <String>CompoundKey</String>
+          <String>Entity</String>
+          <String>Customer Number</String>
+          <String>Product Number</String>
+          <String>Orginal Invoice</String>
+          <String>Inventory Org</String>
+          <String>Invoice Number</String>
+          <String>Doc Type</String>
+          <String>U/M</String>
+          <String>Trans Type</String>
+          <String>Flag</String>
+          <String>Region</String>
+          <String>Sub-region</String>
+          <String>Country</String>
+          <String>State</String>
+          <String>CURRENCY</String>
+          <String>PRODUCT NUMBER</String>
+          <String>Customer Roll Up</String>
+          <String>SBU</String>
+          <String>Product Division</String>
+          <String>Business Division</String>
+          <String>Customer Division</String>
+          <String>GBU</String>
+          <String>BudgetInc</String>
+          <String>SI_FN</String>
+          <String>2019</String>
+          <String>2020</String>
+          <String>ForecastInc</String>
+          <String>2018</String>
+          <String>Customer Name</String>
+          <String>Customer Industry</String>
+          <String>Customer Flag</String>
+          <String>Customer Type</String>
+          <String>CustomerSubRegion Flag</String>
+          <String>File name</String>
+          <String>FILENAME</String>
+          <String>$Field</String>
+          <String>$Table</String>
+          <String>$Info</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$numeric</Tag>
+        <FieldNames>
+          <String>ReloadTime</String>
+          <String>RN</String>
+          <String>ShipToDeliveryLocationID</String>
+          <String>CustomerShipToAddressID</String>
+          <String>Order Number</String>
+          <String>Address Number</String>
+          <String>Sales Qty</String>
+          <String>GROSS Sales Amount LC</String>
+          <String>Returns LC</String>
+          <String>Sales Cost Amount LC (net see thru)</String>
+          <String>BASE_COGS</String>
+          <String>Settlement Discount LC</String>
+          <String>Trxn Sales Amount</String>
+          <String>Trxn COGS Amount</String>
+          <String>Co-op Rebate LC</String>
+          <String>Rebates LC</String>
+          <String>Volume Discount LC</String>
+          <String>BOGO</String>
+          <String>Slotting</String>
+          <String>TPR</String>
+          <String>Other</String>
+          <String>COGS Adj 1 LC</String>
+          <String>COGS Adj 2 LC</String>
+          <String>Type of Discount #</String>
+          <String>Type of Discount Name</String>
+          <String>Offer #</String>
+          <String>QC</String>
+          <String>REC_NO</String>
+          <String>ToValue</String>
+          <String>BudgetDate</String>
+          <String>Budget Quantity</String>
+          <String>Budget_Volume</String>
+          <String>Budget Sales</String>
+          <String>Budget_Sales</String>
+          <String>Budget COGS</String>
+          <String>Budget_COGS</String>
+          <String>ForecastDate</String>
+          <String>Forecast Quantity</String>
+          <String>Forecast_Volume</String>
+          <String>Forecast Sales</String>
+          <String>Forecast_Sales</String>
+          <String>Forecast COGS</String>
+          <String>Forecast_COGS</String>
+          <String>INDUSTRY (IN BI)</String>
+          <String>Sub-region</String>
+          <String>LOG.RN</String>
+          <String>QtyWorning</String>
+          <String>$Rows</String>
+          <String>$Fields</String>
+          <String>$FieldNo</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$timestamp</Tag>
+        <FieldNames>
+          <String>ReloadTime</String>
+          <String>BudgetDate</String>
+          <String>ForecastDate</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$integer</Tag>
+        <FieldNames>
+          <String>RN</String>
+          <String>ShipToDeliveryLocationID</String>
+          <String>CustomerShipToAddressID</String>
+          <String>Order Number</String>
+          <String>Address Number</String>
+          <String>Sales Qty</String>
+          <String>GROSS Sales Amount LC</String>
+          <String>Returns LC</String>
+          <String>Sales Cost Amount LC (net see thru)</String>
+          <String>BASE_COGS</String>
+          <String>Settlement Discount LC</String>
+          <String>Trxn Sales Amount</String>
+          <String>Trxn COGS Amount</String>
+          <String>Co-op Rebate LC</String>
+          <String>Rebates LC</String>
+          <String>Volume Discount LC</String>
+          <String>BOGO</String>
+          <String>Slotting</String>
+          <String>TPR</String>
+          <String>Other</String>
+          <String>COGS Adj 1 LC</String>
+          <String>COGS Adj 2 LC</String>
+          <String>Type of Discount #</String>
+          <String>Type of Discount Name</String>
+          <String>Offer #</String>
+          <String>QC</String>
+          <String>REC_NO</String>
+          <String>ToValue</String>
+          <String>BudgetDate</String>
+          <String>ForecastDate</String>
+          <String>INDUSTRY (IN BI)</String>
+          <String>Sub-region</String>
+          <String>LOG.RN</String>
+          <String>QtyWorning</String>
+          <String>$Rows</String>
+          <String>$Fields</String>
+          <String>$FieldNo</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$key</Tag>
+        <FieldNames>
+          <String>FN</String>
+          <String>RN</String>
+          <String>CURRENCY</String>
+          <String>CUSTOMER CODE</String>
+          <String>PRODUCT NUMBER</String>
+          <String>ShipToDeliveryLocationID</String>
+          <String>BudgetDate</String>
+          <String>Budget Quantity</String>
+          <String>Budget_Volume</String>
+          <String>Budget Sales</String>
+          <String>Budget_Sales</String>
+          <String>Budget COGS</String>
+          <String>Budget_COGS</String>
+          <String>Region</String>
+          <String>Sub-region</String>
+          <String>Country</String>
+          <String>State</String>
+          <String>Customer Roll Up</String>
+          <String>SBU</String>
+          <String>Product Division</String>
+          <String>Business Division</String>
+          <String>Customer Division</String>
+          <String>GBU</String>
+          <String>BudgetInc</String>
+          <String>ForecastDate</String>
+          <String>Forecast Quantity</String>
+          <String>Forecast_Volume</String>
+          <String>Forecast Sales</String>
+          <String>Forecast_Sales</String>
+          <String>Forecast COGS</String>
+          <String>Forecast_COGS</String>
+          <String>ForecastInc</String>
+          <String>Module</String>
+          <String>STATUS</String>
+          <String>LOG.RN</String>
+          <String>ReloadTime</String>
+          <String>TABLE</String>
+          <String>MESSAGE</String>
+          <String>REC_NO</String>
+          <String>FromValue</String>
+          <String>ToValue</String>
+          <String>FILENAME</String>
+          <String>File name</String>
+          <String>$Field</String>
+          <String>$Table</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$date</Tag>
+        <FieldNames>
+          <String>BudgetDate</String>
+          <String>ForecastDate</String>
+        </FieldNames>
+      </FieldTagData>
+    </ScriptBased>
+    <Interactive>
+      <FieldTagData>
+        <Tag>$numeric</Tag>
+        <FieldNames>
+          <String>ReloadTime</String>
+        </FieldNames>
+      </FieldTagData>
+      <FieldTagData>
+        <Tag>$timestamp</Tag>
+        <FieldNames>
+          <String>ReloadTime</String>
+        </FieldNames>
+      </FieldTagData>
+    </Interactive>
+  </FieldTags>
+  <FieldComments></FieldComments>
+  <TableComments></TableComments>
+  <CreatePrjFolder>false</CreatePrjFolder>
+  <LinkedTables></LinkedTables>
+  <AppObjectEntries></AppObjectEntries>
+  <GenericDimensions></GenericDimensions>
+  <GenericMeasures></GenericMeasures>
+  <GenericBookmarks></GenericBookmarks>
+  <ConnectionInfo></ConnectionInfo>
+  <GenericDerivedDefinitions></GenericDerivedDefinitions>
+  <GenericDerivedFields></GenericDerivedFields>
+  <BnfOff>false</BnfOff>
+  <CreatedAfterSingleQuoteExactSearch>false</CreatedAfterSingleQuoteExactSearch>
+</DocInternals>

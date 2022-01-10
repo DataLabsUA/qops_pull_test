@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>pFCError</Name>
+    <Content>Expected to have "COGS_SAP_[YYYYMM].QVD"</Content>
+  </Variable>
+</Variables>

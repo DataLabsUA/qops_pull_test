@@ -1,0 +1,16 @@
+﻿Sub CopyGroup (SrcName, DstName)
+    Set SrcGrp = ActiveDocument.GetGroup(SrcName)
+    Set SrcProps = SrcGrp.GetProperties
+    Set DstGrp = ActiveDocument.CreateGroup(DstName)
+    Set DstProps = DstGrp.GetProperties
+    DstProps.FieldDefs.CopyFrom SrcProps.FieldDefs
+    DstProps.IsCyclic = SrcProps.IsCyclic
+    DstProps.Labels = SrcProps.Labels
+    DstProps.Present = SrcProps.Present
+    DstProps.SortCriterias.CopyFrom SrcProps.SortCriterias
+    DstGrp.SetProperties DstProps
+End Sub
+
+Sub DoCopying
+    CopyGroup "{Group #1}", "{Group #4}"
+End Sub

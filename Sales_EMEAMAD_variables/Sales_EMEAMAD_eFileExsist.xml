@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>eFileExsist</Name>
+    <Content>if(FileSize('$1')&gt;0,-1,0)</Content>
+  </Variable>
+</Variables>

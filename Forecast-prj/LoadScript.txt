@@ -1,0 +1,536 @@
+﻿///$tab License
+/*************************************************************************
+* 
+* Ansell Healthcare, LLC
+* DVSTS Ltd.
+* CONFIDENTIAL
+* __________________
+* 
+* 2016 Ansell Healthcare, LLC 
+* 2016 DVSTS Ltd. 
+* All Rights Reserved.
+* 
+* NOTICE:  All information contained herein is, and remains
+* the property of Ansell Healthcare, LLC and DVSTS Ltd. The
+* intellectual and technical concepts contained herein are
+* proprietary to Ansell Healthcare, LLC and DVSTS Ltd. and
+* may be covered by U.S. and Foreign Patents, patents in
+* process, and are protected by trade secret or copyright
+* law. Dissemination of this information or reproduction of
+* this material is strictly forbidden unless prior written
+* permission is obtained from Ansell Healthcare, LLC.
+*************************************************************************/
+ 
+///$tab Main
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='₹ #,##0.00;₹ -#,##0.00';
+SET TimeFormat='hh:mm:ss';
+SET DateFormat='MM/DD/YYYY';
+SET TimestampFormat='MM/DD/YYYY hh:mm:ss[.fff]';
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+
+LET vReloadTime = Num(Now(),'##############');
+
+$(Include=.\ForecastSettings.qvs);
+
+LET vSrcPath = if(Right(vSrcPath,1) = '\',vSrcPath,vSrcPath&'\');
+LET vQVDPath = if(Right(vQVDPath,1) = '\',vQVDPath,vQVDPath&'\');
+
+$(Include=$(vINCPath)procedures.qvs);
+$(Include=$(vINCPath)\transformmailprocedures.qvs);
+
+LET pStartDate = 0;
+///$tab Forecast
+SUB ForecastParse(pFP_FileMask,pFP_Spec,pFP_Field)
+	
+	FOR Each vFP_File in FileList(pFP_FileMask)
+	
+		TRACE $(vFP_File);
+
+		LET vFP_ErrorMode = ErrorMode;
+		SET ErrorMode = 0;
+		
+		tFP_1:
+		NoConcatenate
+		LOAD 
+			Null() as FN
+		AutoGenerate (0);
+		
+		Concatenate (tFP_1)
+		LOAD 
+			FilePath() & ' $(pFP_Field)' as FN
+			,*
+		FROM
+		[$(vFP_File)]
+		($(pFP_Spec));
+		
+		LET vFP_ScriptError = ScriptError;
+		
+		IF (vFP_ScriptError > 0) OR (NoOfFields('tFP_1') <=1) then
+		
+			IF (vFP_ScriptError > 0) THEN
+	
+				SET vFP_Message = 'File [$(vFP_File)] thrown an error: $(vFP_ScriptError)';
+				CALL LogMessage(pFP_Field,cFAILURE,vFP_Message);
+				
+			ENDIF;
+			
+			CALL DropTable('tFP_1');
+
+			LET ErrorMode = vFP_ErrorMode;
+			LET vFP_ErrorMode = Null();		
+			
+		ELSE
+	
+			LET ErrorMode = vFP_ErrorMode;
+			LET vFP_ErrorMode = Null();		
+			
+			LET vFP_NoOfFields = NoOfFields('tFP_1');
+			LET vFP_Header = '';
+			LET vFP_HeaderCnt = 0;
+			LET vFP_Attrib = '';
+			LET vFP_Attrib_RSum = '';
+			
+			FOR vFP_i = 1 to vFP_NoOfFields
+			
+				LET vFP_FieldName = FieldName(vFP_i,'tFP_1');
+				
+				IF IsNull(Date(Date#(vFP_FieldName,'YYYY-MM'))) then
+				
+					IF not Match(vFP_FieldName,'Period','ForecastSales','ForecastDate') then
+				
+						LET vFP_Header = vFP_Header & if(Len(vFP_Header)>0,',','') & '[' & vFP_FieldName & ']';
+					
+					ELSE
+					
+						LET vFP_Header = vFP_Header & if(Len(vFP_Header)>0,',','') & '[' & vFP_FieldName & ']' & ' AS ' & '[' & '_' & vFP_FieldName & ']';
+					
+					ENDIF;
+					
+					LET vFP_HeaderCnt = vFP_HeaderCnt + 1;
+				
+				ELSE
+			
+					LET vFP_Attrib = vFP_Attrib & ',' & '[' & vFP_FieldName & ']';
+					LET vFP_Attrib_RSum = vFP_Attrib_RSum & ',' & 'fAbs(Num([' & vFP_FieldName & ']))';
+				
+				ENDIF;
+			
+			NEXT vFP_i;
+			
+			tFP_2:
+			CrossTable(Period, $(pFP_Field)_, $(vFP_HeaderCnt))
+			LOAD
+				$(vFP_Header)
+				$(vFP_Attrib)
+			Resident tFP_1
+			Where RangeSum(0$(vFP_Attrib_RSum))>0;
+	
+			CALL DropTable('tFP_1');
+			
+			IF IsNull(TableNumber('tFP_Out')) then
+	
+				tFP_Out:
+				NoConcatenate
+				LOAD
+					*
+					,RowNo() as RN
+					,Num(Date#(Period,'YYYY-MM')) as ForecastDate
+					,Num($(pFP_Field)_) as $(pFP_Field)
+				Resident tFP_2
+				Where fAbs(Num($(pFP_Field)_))>0;
+			
+			ELSE
+			
+				Concatenate(tFP_Out)
+				LOAD
+					*
+					,RowNo() as RN
+					,Num(Date#(Period,'YYYY-MM')) as ForecastDate
+					,Num($(pFP_Field)_) as $(pFP_Field)
+				Resident tFP_2
+				Where fAbs(Num($(pFP_Field)_))>0;
+			
+			ENDIF;
+			
+			CALL DropTable('tFP_2');
+			
+			IF not cStore = 0 then
+	
+				LET vFP_StorePath = cStore&Left(pFP_FileMask,len(pFP_FileMask)-len(SubField(Replace(pFP_FileMask,'/','\'),'\',-1)))&'*.*';
+			
+				EXECUTE powershell -Command "& {xCopy '$(vFP_File)' '$(vFP_StorePath)' /y}"; 
+				
+				LET vFP_StorePath = Null();
+			
+			ENDIF
+	
+			SET vFP_Message = 'File [$(vFP_File)] loaded successfuly';
+			CALL LogMessage(pFP_Field,cSUCCESSFUL,vFP_Message);
+		ENDIF;
+		
+		LET vFP_ScriptError = Null();
+		LET vFP_NoOfFields 	= Null();
+		LET vFP_Header 		= Null();
+		LET vFP_HeaderCnt 	= Null();
+		LET vFP_Attrib 		= Null();
+		LET vFP_Attrib_RSum = Null();
+		LET vFP_i 			= Null();
+		LET vFP_FieldName 	= Null();
+		LET vFP_Message 	= Null();
+		
+
+	NEXT vFP_File;
+
+	CALL LogMessage(pFP_Field,cSUCCESSFUL);
+	LET vFP_File = Null();
+
+ENDSUB;
+
+SET p_Spec = ooxml, embedded labels, table is [NET SALES];
+SET p_Field = Forecast_Sales;
+SET p_CALL = CALL ForecastParse(vPD_Dir&'\Forecast*.xlsx',p_Spec,p_Field);
+CALL ParseDir('$(vSrcPath)Master\Forecast*',False(),p_CALL);
+LET p_Spec 	= Null(); 
+LET p_Field = Null(); 
+LET p_CALL 	= Null();
+
+DROP Field Period From tFP_Out;
+
+Left Join (tFP_Out)
+	LOAD Distinct
+		ForecastDate
+		,Text(Date(ForecastDate,'YYYY')) as ForecastInc
+	Resident tFP_Out;
+
+Concatenate(tFP_Out)
+	LOAD
+		Null() as [RN]
+		,Null() as [FN]
+		,Null() as [CUSTOMER CODE]
+		,Null() as [ShipToDeliveryLocationID]
+		,Null() as [PRODUCT NUMBER]
+		,Null() as [CURRENCY]
+		,Null() as [ForecastDate]
+		,Null() as [Forecast_Sales]
+		,Null() as [Forecast_COGS]
+		,Null() as [Forecast_Volume]
+	AutoGenerate(0);
+
+SET p_Table 			= tFP_Out;
+SET p_StoreFieldList 	= [RN],[FN],[CUSTOMER CODE],[ShipToDeliveryLocationID],[PRODUCT NUMBER],[CURRENCY],[ForecastDate],[Forecast_Sales],[Forecast_COGS],[Forecast_Volume];
+SET p_IncrementalField 	= [ForecastInc];
+SET p_StoreName 		= Forecast;
+SET p_StartDate 		=  or Num(ForecastDate) < $(pStartDate);
+CALL StoreIncremental(p_Table,p_StoreFieldList,p_IncrementalField,p_StoreName)
+LET p_Table 			= Null();
+LET p_StoreFieldList 	= Null();
+LET p_IncrementalField 	= Null();
+LET p_StoreName 		= Null();
+LET p_StartDate			= Null();
+
+CALL DropTable('tFP_Out');
+
+SET p_Spec = ooxml, embedded labels, table is [COGS];
+SET p_Field = Forecast_COGS;
+SET p_CALL = CALL ForecastParse(vPD_Dir&'\Forecast*.xlsx',p_Spec,p_Field);
+CALL ParseDir('$(vSrcPath)Master\Forecast*',False(),p_CALL);
+LET p_Spec 	= Null(); 
+LET p_Field = Null(); 
+LET p_CALL 	= Null();
+
+DROP Field Period From tFP_Out;
+
+Left Join (tFP_Out)
+	LOAD Distinct
+		ForecastDate
+		,Text(Date(ForecastDate,'YYYY')) as ForecastInc
+	Resident tFP_Out;
+
+Concatenate(tFP_Out)
+	LOAD
+		Null() as [RN]
+		,Null() as [FN]
+		,Null() as [CUSTOMER CODE]
+		,Null() as [ShipToDeliveryLocationID]
+		,Null() as [PRODUCT NUMBER]
+		,Null() as [CURRENCY]
+		,Null() as [ForecastDate]
+		,Null() as [Forecast_Sales]
+		,Null() as [Forecast_COGS]
+		,Null() as [Forecast_Volume]
+	AutoGenerate(0);
+
+SET p_Table 			= tFP_Out;
+SET p_StoreFieldList 	= [RN],[FN],[CUSTOMER CODE],[ShipToDeliveryLocationID],[PRODUCT NUMBER],[CURRENCY],[ForecastDate],[Forecast_Sales],[Forecast_COGS],[Forecast_Volume];
+SET p_IncrementalField 	= [ForecastInc];
+SET p_StoreName 		= Forecast;
+SET p_StartDate 		=  or Num(ForecastDate) < $(pStartDate);
+CALL StoreIncremental(p_Table,p_StoreFieldList,p_IncrementalField,p_StoreName)
+LET p_Table 			= Null();
+LET p_StoreFieldList 	= Null();
+LET p_IncrementalField 	= Null();
+LET p_StoreName 		= Null();
+LET p_StartDate			= Null();
+
+CALL DropTable('tFP_Out');
+
+SET p_Spec = ooxml, embedded labels, table is [VOLUMES];
+SET p_Field = Forecast_Volume;
+SET p_CALL = CALL ForecastParse(vPD_Dir&'\Forecast*.xlsx',p_Spec,p_Field);
+CALL ParseDir('$(vSrcPath)Master\Forecast*',False(),p_CALL);
+LET p_Spec 	= Null(); 
+LET p_Field = Null(); 
+LET p_CALL 	= Null();
+
+DROP Field Period From tFP_Out;
+
+Left Join (tFP_Out)
+	LOAD Distinct
+		ForecastDate
+		,Text(Date(ForecastDate,'YYYY')) as ForecastInc
+	Resident tFP_Out;
+
+Concatenate(tFP_Out)
+	LOAD
+		Null() as [RN]
+		,Null() as [FN]
+		,Null() as [CUSTOMER CODE]
+		,Null() as [ShipToDeliveryLocationID]
+		,Null() as [PRODUCT NUMBER]
+		,Null() as [CURRENCY]
+		,Null() as [ForecastDate]
+		,Null() as [Forecast_Sales]
+		,Null() as [Forecast_COGS]
+		,Null() as [Forecast_Volume]
+	AutoGenerate(0);
+
+SET p_Table 			= tFP_Out;
+SET p_StoreFieldList 	= [RN],[FN],[CUSTOMER CODE],[ShipToDeliveryLocationID],[PRODUCT NUMBER],[CURRENCY],[ForecastDate],[Forecast_Sales],[Forecast_COGS],[Forecast_Volume];
+SET p_IncrementalField 	= [ForecastInc];
+SET p_StoreName 		= Forecast;
+SET p_StartDate 		=  or Num(ForecastDate) < $(pStartDate);
+CALL StoreIncremental(p_Table,p_StoreFieldList,p_IncrementalField,p_StoreName)
+LET p_Table 			= Null();
+LET p_StoreFieldList 	= Null();
+LET p_IncrementalField 	= Null();
+LET p_StoreName 		= Null();
+LET p_StartDate			= Null();
+
+CALL DropTable('tFP_Out');
+
+///$tab Forecast PBCS
+Let vSrcPath_t = vSrcPath;
+let vSrcPath = vSrcPathPBCS;
+
+
+//Sales
+
+SET p_Spec = txt, utf8, embedded labels, delimiter is ',', msq;
+SET p_Field = Forecast_Sales;
+SET p_CALL = CALL ForecastParse(vPD_Dir&'\*Fcast*SALES*.csv',p_Spec,p_Field);
+CALL ParseDir('$(vSrcPath)',False(),p_CALL);
+LET p_Spec 	= Null(); 
+LET p_Field = Null(); 
+LET p_CALL 	= Null();
+
+DROP Field Period From tFP_Out;
+
+Left Join (tFP_Out)
+	LOAD Distinct
+		ForecastDate
+		,Text(Date(ForecastDate,'YYYY')) as ForecastInc
+	Resident tFP_Out;
+	
+RENAME Field [Currency] to [CURRENCY];
+
+Concatenate(tFP_Out)
+	LOAD
+		Null() as [RN]
+		,Null() as [FN]
+		,Null() as [CUSTOMER CODE]
+		,Null() as [ShipToDeliveryLocationID]
+		,Null() as [PRODUCT NUMBER]
+		,Null() as [CURRENCY]
+		,Null() as [ForecastDate]
+		,Null() as [Forecast_Sales]
+		,Null() as [Forecast_COGS]
+		,Null() as [Forecast_Volume]
+	AutoGenerate(0);
+	
+
+SET p_Table 			= tFP_Out;
+SET p_StoreFieldList 	= [RN],[FN],[CUSTOMER CODE],[ShipToDeliveryLocationID],[PRODUCT NUMBER],[CURRENCY],[ForecastDate],[Forecast_Sales],[Forecast_COGS],[Forecast_Volume];
+SET p_IncrementalField 	= [ForecastInc];
+SET p_StoreName 		= Forecast;
+SET p_StartDate 		=  or Num(ForecastDate) < $(pStartDate);
+CALL StoreIncremental(p_Table,p_StoreFieldList,p_IncrementalField,p_StoreName)
+LET p_Table 			= Null();
+LET p_StoreFieldList 	= Null();
+LET p_IncrementalField 	= Null();
+LET p_StoreName 		= Null();
+LET p_StartDate			= Null();
+
+CALL DropTable('tFP_Out');
+
+//COGS
+
+SET p_Spec = txt, utf8, embedded labels, delimiter is ',', msq;
+SET p_Field = Forecast_COGS;
+SET p_CALL = CALL ForecastParse(vPD_Dir&'\*Fcast*COGS*.csv',p_Spec,p_Field);
+CALL ParseDir('$(vSrcPath)',False(),p_CALL);
+LET p_Spec 	= Null(); 
+LET p_Field = Null(); 
+LET p_CALL 	= Null();
+
+DROP Field Period From tFP_Out;
+
+Left Join (tFP_Out)
+	LOAD Distinct
+		ForecastDate
+		,Text(Date(ForecastDate,'YYYY')) as ForecastInc
+	Resident tFP_Out;
+	
+RENAME Field [Currency] to [CURRENCY];
+
+Concatenate(tFP_Out)
+	LOAD
+		Null() as [RN]
+		,Null() as [FN]
+		,Null() as [CUSTOMER CODE]
+		,Null() as [ShipToDeliveryLocationID]
+		,Null() as [PRODUCT NUMBER]
+		,Null() as [CURRENCY]
+		,Null() as [ForecastDate]
+		,Null() as [Forecast_Sales]
+		,Null() as [Forecast_COGS]
+		,Null() as [Forecast_Volume]
+	AutoGenerate(0);
+
+SET p_Table 			= tFP_Out;
+SET p_StoreFieldList 	= [RN],[FN],[CUSTOMER CODE],[ShipToDeliveryLocationID],[PRODUCT NUMBER],[CURRENCY],[ForecastDate],[Forecast_Sales],[Forecast_COGS],[Forecast_Volume];
+SET p_IncrementalField 	= [ForecastInc];
+SET p_StoreName 		= Forecast;
+SET p_StartDate 		=  or Num(ForecastDate) < $(pStartDate);
+CALL StoreIncremental(p_Table,p_StoreFieldList,p_IncrementalField,p_StoreName)
+LET p_Table 			= Null();
+LET p_StoreFieldList 	= Null();
+LET p_IncrementalField 	= Null();
+LET p_StoreName 		= Null();
+LET p_StartDate			= Null();
+
+CALL DropTable('tFP_Out');
+
+
+//Volume
+SET p_Spec = txt, utf8, embedded labels, delimiter is ',', msq;
+SET p_Field = Forecast_Volume;
+SET p_CALL = CALL ForecastParse(vPD_Dir&'\*Fcast*VOLUMES*.csv',p_Spec,p_Field);
+CALL ParseDir('$(vSrcPath)',False(),p_CALL);
+LET p_Spec 	= Null(); 
+LET p_Field = Null(); 
+LET p_CALL 	= Null();
+
+DROP Field Period From tFP_Out;
+
+Left Join (tFP_Out)
+	LOAD Distinct
+		ForecastDate
+		,Text(Date(ForecastDate,'YYYY')) as ForecastInc
+	Resident tFP_Out;
+
+Concatenate(tFP_Out)
+	LOAD
+		Null() as [RN]
+		,Null() as [FN]
+		,Null() as [CUSTOMER CODE]
+		,Null() as [ShipToDeliveryLocationID]
+		,Null() as [PRODUCT NUMBER]
+		,Null() as [CURRENCY]
+		,Null() as [ForecastDate]
+		,Null() as [Forecast_Sales]
+		,Null() as [Forecast_COGS]
+		,Null() as [Forecast_Volume]
+	AutoGenerate(0);
+
+SET p_Table 			= tFP_Out;
+SET p_StoreFieldList 	= [RN],[FN],[CUSTOMER CODE],[ShipToDeliveryLocationID],[PRODUCT NUMBER],[CURRENCY],[ForecastDate],[Forecast_Sales],[Forecast_COGS],[Forecast_Volume];
+SET p_IncrementalField 	= [ForecastInc];
+SET p_StoreName 		= Forecast;
+SET p_StartDate 		=  or Num(ForecastDate) < $(pStartDate);
+CALL StoreIncremental(p_Table,p_StoreFieldList,p_IncrementalField,p_StoreName)
+LET p_Table 			= Null();
+LET p_StoreFieldList 	= Null();
+LET p_IncrementalField 	= Null();
+LET p_StoreName 		= Null();
+LET p_StartDate			= Null();
+
+CALL DropTable('tFP_Out');
+
+Let vSrcPath = vSrcPath_t;
+Let vSrcPath_t = Null();
+///$tab Logs
+
+CALL DelLog ('$(vLOGPath)','$(vLogDocPrefixName)',$(vLogCountSaveLoad))
+
+LET vReloadTime = Timestamp(vReloadTime,'YYYYMMDDhhmmss');
+
+LOG:
+LOAD
+	RecNo() as [LOG.RN]
+	,[Module]
+	,[ReloadTime]
+	,[TABLE]
+	,[STATUS]
+	,IF(STATUS = 'WARNING','Line #'&([REC_NO])&' in field ['&[MESSAGE]&'] data was replaced from value "'&FromValue&'" to value "'&ToValue&'"
+	Source file: "'&FN&'"', MESSAGE)	as MESSAGE
+	,REC_NO
+    ,FromValue
+    ,ToValue
+	,if([STATUS] = 'WARNING ON DOUBLES'
+		,'DOUBLES'
+		,TextBetween([MESSAGE],'[',']',1)) as [FILENAME],
+	FN									as [File name]
+FROM
+[$(vLOGPath)$(vLogDocPrefixName)*$(vReloadTime).qvd]
+(qvd)
+//Where Upper([Module]) = Upper(DocumentPath())
+;
+	
+	[Log_Error]:
+	LOAD 	Module,
+			STATUS,
+			//TABLE,
+			COUNT(STATUS) as QtyWorning
+	Resident LOG
+	Where STATUS <> 'FAILURE'
+	Group BY 	Module,
+				STATUS/*,
+				TABLE*/;
+	
+	IF NoOfFields('Log_Error') then	
+		STORE Log_Error into '$(vLOGPath)$(vLogTotalPrefixName)Error_$(vReloadTime).qvd' (qvd);
+		
+		DROP Table Log_Error;
+	ENDIF	
+
+	CALL DelLog ('$(vLOGPath)','$(vLogDocPrefixName)',$(vLogCountSaveLoad))
+	
+		[Log_FAILURE]:
+		NoConcatenate LOAD 	*
+		Resident LOG
+		Where STATUS = 'FAILURE';
+	
+	IF NoOfFields('Log_FAILURE') then	
+		STORE Log_FAILURE into '$(vLOGPath)$(vLogTotalPrefixName)FAILURE_$(vReloadTime).qvd' (qvd);
+		
+		DROP Table Log_FAILURE;
+	ENDIF	
+
+	CALL DelLog ('$(vLOGPath)','$(vLogTotalPrefixName)',$(vLogCountSaveLoad))
+///$tab Mail
+CALL FailuresInTransformMessage('');

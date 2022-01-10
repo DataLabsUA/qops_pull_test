@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vLogsFolder</Name>
+    <Content>.\MastersReloadLogs</Content>
+  </Variable>
+</Variables>

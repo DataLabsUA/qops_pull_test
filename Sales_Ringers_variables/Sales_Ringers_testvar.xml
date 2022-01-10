@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>testvar</Name>
+    <Content>if(wildmatch(FileName(),'*JUNE F21*', '*MAY F21*')&gt;0, 'YES', 'NO')</Content>
+  </Variable>
+</Variables>

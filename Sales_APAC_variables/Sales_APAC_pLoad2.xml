@@ -1,0 +1,37 @@
+<Variables>
+  <Variable>
+    <Name>pLoad2</Name>
+    <Content>LOAD 
+     if(Entity='Adj','200',Entity) as [Company Number Detail],
+     Sales_DB,
+     DocumentType as [Doc Type],
+    if(DocumentType='Credit Memo','0',if(DocumentType='Fin Adjust','0', if( DocumentType='Invoice','0',if(DocumentType='Rebate',Sales_DB*-1,Sales_DB)))) as Rebate_LC,  
+    if(DocumentType='Rebate','0',if(DocumentType='Fin Adjust','0',if( DocumentType='Invoice','0',if(DocumentType='Credit Memo',Sales_DB*-1,Sales_DB)))) as Returns,
+     if(DocumentType='Credit Memo','0',if(DocumentType='Rebate','0',if((DocumentType='Fin Adjust' and DocumentType='Invoice'),Sales_DB,Sales_DB))) as [GROSS Sales Amount   LC],
+     [Invoice Number], 
+     [Order Number], 
+     IF(Entity='AS' AND [Address Number]='','0001',IF(Entity='APS_SIN' AND [Address Number]='','0001',IF(Entity='200',RIGHT(ShipToKey,4),[Address Number]))) as ShipToDeliveryLocationID,
+     [Invoice Date],
+     WHS_CODE as [Item Branch Key (ing org#)], 
+     LocalCurrency as [Trxn Currency], 
+     DB_CURRENCY, 
+     OCCURNCY as [COGS Trxn currency],
+      [Sales Qty per Order], 
+      [Sales Qty] AS [Sales Quantity], 
+     ActualSales as [Trxn Sales Amount], 
+     Cost, 
+     ((FACT_COST_RAW)*([Sales Qty per Order]))  as [Trxn COGS Amount], 
+     ((FACT_COST_BUR) * ([Sales Qty per Order])) as [COGS adj1], 
+     CST_DB_DAILY as [Sales Cost Amount LC (net see thru)],
+     RebateKey as [Offer#], 
+     If(Entity='Adj',200,Entity) &amp;'-'&amp; applymap('mGaryCustNo',CustomerKey) as  [Customer ID],  
+     If(Entity='Adj',200,Entity) &amp;'-'&amp; applymap('mGaryItemNo',ProductKey) as [Product Number], 
+     applymap('mGaryUOM',ProductKey) as [UOM Standard], 
+
+
+     Cost_Legal_Entity,
+
+	 [PO_NBR],
+     [Trans Type]</Content>
+  </Variable>
+</Variables>

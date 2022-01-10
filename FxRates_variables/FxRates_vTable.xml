@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vTable</Name>
+    <Content>Concatenate([Product])</Content>
+  </Variable>
+</Variables>

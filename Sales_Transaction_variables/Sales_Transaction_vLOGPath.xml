@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vLOGPath</Name>
+    <Content>..\_LOG\</Content>
+  </Variable>
+</Variables>

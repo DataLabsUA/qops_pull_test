@@ -1,0 +1,395 @@
+﻿///$tab License
+/*************************************************************************
+* 
+* Ansell Healthcare, LLC
+* DVSTS Ltd.
+* CONFIDENTIAL
+* __________________
+* 
+* 2016 Ansell Healthcare, LLC 
+* 2016 DVSTS Ltd. 
+* All Rights Reserved.
+* 
+* NOTICE:  All information contained herein is, and remains
+* the property of Ansell Healthcare, LLC and DVSTS Ltd. The
+* intellectual and technical concepts contained herein are
+* proprietary to Ansell Healthcare, LLC and DVSTS Ltd. and
+* may be covered by U.S. and Foreign Patents, patents in
+* process, and are protected by trade secret or copyright
+* law. Dissemination of this information or reproduction of
+* this material is strictly forbidden unless prior written
+* permission is obtained from Ansell Healthcare, LLC.
+*************************************************************************/
+ 
+///$tab Main
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='₹ #,##0.00;₹ -#,##0.00';
+SET TimeFormat='hh:mm:ss';
+SET DateFormat='MM/DD/YYYY';
+SET TimestampFormat='MM/DD/YYYY hh:mm:ss[.fff]';
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+
+LET vReloadTime = Num(Now(),'##############');
+
+$(Include=.\TargetSettings.qvs);
+
+LET vSrcPath = if(Right(vSrcPath,1) = '\',vSrcPath,vSrcPath&'\');
+LET vQVDPath = if(Right(vQVDPath,1) = '\',vQVDPath,vQVDPath&'\');
+
+$(Include=$(vINCPath)procedures.qvs);
+$(Include=$(vINCPath)\transformmailprocedures.qvs);
+
+LET pStartDate = 0;
+///$tab Target
+SUB TargetParse(pTP_FileMask,pTP_Spec,pTP_Field)
+	
+	FOR Each vTP_File in FileList(pTP_FileMask)
+	
+		TRACE $(vTP_File);
+
+		LET vTP_ErrorMode = ErrorMode;
+		SET ErrorMode = 0;
+
+		tTP_1:
+		NoConcatenate
+		LOAD 
+			FilePath() & ' $(pTP_Field)' as FN
+			,*
+		FROM
+		[$(vTP_File)]
+		($(pTP_Spec));
+		
+		LET vTP_ScriptError = ScriptError;
+		
+		IF vTP_ScriptError > 0 then
+	
+			SET vTP_Message = 'File [$(vTP_File)] thrown an error: $(vTP_ScriptError)';
+			CALL LogMessage(pTP_Field,cFAILURE,vTP_Message);
+			
+			LET ErrorMode = vTP_ErrorMode;
+			LET vTP_ErrorMode = Null();
+		
+		ELSE
+	
+			LET ErrorMode = vTP_ErrorMode;
+			LET vTP_ErrorMode = Null();
+			
+			LET vTP_NoOfFields = NoOfFields('tTP_1');
+			LET vTP_Header = '';
+			LET vTP_HeaderCnt = 0;
+			LET vTP_Attrib = '';
+			
+			FOR vTP_i = 1 to vTP_NoOfFields
+			
+				LET vTP_FieldName = FieldName(vTP_i,'tTP_1');
+				
+				IF IsNull(Date(Date#(vTP_FieldName,'YYYY-MM'))) then
+				
+					IF not Match(vTP_FieldName,'Period','TargetSales','TargetDate') then
+				
+						LET vTP_Header = vTP_Header & if(Len(vTP_Header)>0,',','') & '[' & vTP_FieldName & ']';
+					
+					ELSE
+					
+						LET vTP_Header = vTP_Header & if(Len(vTP_Header)>0,',','') & '[' & vTP_FieldName & ']' & ' as ' & '[' & '_' & vTP_FieldName & ']';
+					
+					ENDIF;
+					
+					LET vTP_HeaderCnt = vTP_HeaderCnt + 1;
+				
+				ELSE
+			
+					LET vTP_Attrib = vTP_Attrib & ',' & '[' & vTP_FieldName & ']';
+				
+				ENDIF;
+			
+			NEXT vTP_i;
+			
+			tTP_2:
+			CrossTable(Period, $(pTP_Field)_, $(vTP_HeaderCnt))
+			LOAD
+				$(vTP_Header)
+				$(vTP_Attrib)
+			Resident tTP_1;
+	
+			CALL DropTable('tTP_1');
+			
+			IF IsNull(TableNumber('tTP_Out')) then
+	
+				tTP_Out:
+				NoConcatenate
+				LOAD
+					*
+					,RecNo() as RN
+					,Num(Date#(Period,'YYYY-MM')) as TargetDate
+					,Num($(pTP_Field)_) as $(pTP_Field)
+				Resident tTP_2;
+			
+			ELSE
+			
+				Concatenate(tTP_Out)
+				LOAD
+					*
+					,RecNo() as RN
+					,Num(Date#(Period,'YYYY-MM')) as TargetDate
+					,Num($(pTP_Field)_) as $(pTP_Field)
+				Resident tTP_2;
+			
+			ENDIF;
+			
+			IF not cStore = 0 then
+	
+				LET vTP_StorePath = cStore&Left(pPB_FileMask,len(pPB_FileMask)-len(SubField(Replace(pPB_FileMask,'/','\'),'\',-1)))&'*.*';
+			
+				EXECUTE powershell -Command "& {xCopy '$(vTP_File)' '$(vTP_StorePath)' /y}"; 
+				
+				LET vTP_StorePath = Null();
+			
+			ENDIF
+
+			CALL DropTable('tTP_2');
+		
+			SET vTP_Message = 'File [$(vTP_File)] loaded successfuly';
+			CALL LogMessage(pTP_Field,cSUCCESSFUL,vTP_Message);
+		ENDIF;
+		
+		LET vTP_ScriptError = Null();
+		LET vTP_NoOfFields 	= Null();
+		LET vTP_Header 		= Null();
+		LET vTP_HeaderCnt 	= Null();
+		LET vTP_Attrib 		= Null();
+		LET vTP_i 			= Null();
+		LET vTP_FieldName 	= Null();
+		LET vTP_Message 	= Null();
+		
+
+	NEXT vTP_File;
+
+	CALL LogMessage(pTP_Field,cSUCCESSFUL);
+	LET vTP_File = Null();
+
+ENDSUB;
+
+SET p_Spec = ooxml, embedded labels, table is [NET SALES];
+SET p_Field = Target_Sales;
+SET p_CALL = CALL TargetParse(vPD_Dir&'\Target*.xlsx',p_Spec,p_Field);
+CALL ParseDir('$(vSrcPath)Master\Target*',False(),p_CALL);
+CALL ParseDir('$(vSrcPath)Master\Target SW\Target*',False(),p_CALL);
+LET p_Spec 	= Null(); 
+LET p_Field = Null(); 
+LET p_CALL 	= Null();
+
+DROP Field Period From tTP_Out;
+
+Left Join (tTP_Out)
+	LOAD Distinct
+		TargetDate
+		,Text(Date(TargetDate,'YYYY')) as TargetInc
+	Resident tTP_Out;
+
+Concatenate(tTP_Out)
+	LOAD
+		Null() as [RN]
+		,Null() as [FN]
+		,Null() as [CUSTOMER CODE]
+		,Null() as [ShipToDeliveryLocationID]
+		,Null() as [PRODUCT NUMBER]
+		,Null() as [CURRENCY]
+		,Null() as [TargetDate]
+		,Null() as [Target_COGS]
+		,Null() as [Target_Volume]
+		,Null() as [Target_Sales]
+	AutoGenerate(0);
+	
+SET p_Table 			= tTP_Out;
+SET p_StoreFieldList 	= [RN],[FN],[CUSTOMER CODE],[ShipToDeliveryLocationID],[PRODUCT NUMBER],[CURRENCY],[TargetDate],[Target_COGS],[Target_Volume],[Target_Sales];
+SET p_IncrementalField 	= [TargetInc];
+SET p_StoreName 		= Target;
+SET p_StartDate 		=  or Num(TargetDate) < $(pStartDate);
+CALL StoreIncremental(p_Table,p_StoreFieldList,p_IncrementalField,p_StoreName)
+LET p_Table 			= Null();
+LET p_StoreFieldList 	= Null();
+LET p_IncrementalField 	= Null();
+LET p_StoreName 		= Null();
+LET p_StartDate			= Null();
+
+CALL DropTable('tTP_Out');
+
+SET p_Spec = ooxml, embedded labels, table is [COGS];
+SET p_Field = Target_COGS;
+SET p_CALL = CALL TargetParse(vPD_Dir&'\Target*.xlsx',p_Spec,p_Field);
+CALL ParseDir('$(vSrcPath)Master\Target*',False(),p_CALL);
+CALL ParseDir('$(vSrcPath)Master\Target SW\Target*',False(),p_CALL);
+LET p_Spec 	= Null(); 
+LET p_Field = Null(); 
+LET p_CALL 	= Null();
+
+DROP Field Period From tTP_Out;
+
+Left Join (tTP_Out)
+	LOAD Distinct
+		TargetDate
+		,Text(Date(TargetDate,'YYYY')) as TargetInc
+	Resident tTP_Out;
+
+Concatenate(tTP_Out)
+	LOAD
+		Null() as [RN]
+		,Null() as [FN]
+		,Null() as [CUSTOMER CODE]
+		,Null() as [ShipToDeliveryLocationID]
+		,Null() as [PRODUCT NUMBER]
+		,Null() as [CURRENCY]
+		,Null() as [TargetDate]
+		,Null() as [Target_COGS]
+		,Null() as [Target_Volume]
+		,Null() as [Target_Sales]
+	AutoGenerate(0);
+	
+SET p_Table 			= tTP_Out;
+SET p_StoreFieldList 	= [RN],[FN],[CUSTOMER CODE],[ShipToDeliveryLocationID],[PRODUCT NUMBER],[CURRENCY],[TargetDate],[Target_COGS],[Target_Volume],[Target_Sales];
+SET p_IncrementalField 	= [TargetInc];
+SET p_StoreName 		= Target;
+SET p_StartDate 		=  or Num(TargetDate) < $(pStartDate);
+CALL StoreIncremental(p_Table,p_StoreFieldList,p_IncrementalField,p_StoreName)
+LET p_Table 			= Null();
+LET p_StoreFieldList 	= Null();
+LET p_IncrementalField 	= Null();
+LET p_StoreName 		= Null();
+LET p_StartDate			= Null();
+
+CALL DropTable('tTP_Out');
+
+SET p_Spec = ooxml, embedded labels, table is [VOLUMES];
+SET p_Field = Target_Volume;
+SET p_CALL = CALL TargetParse(vPD_Dir&'\Target*.xlsx',p_Spec,p_Field);
+CALL ParseDir('$(vSrcPath)Master\Target*',False(),p_CALL);
+LET p_Spec 	= Null(); 
+LET p_Field = Null(); 
+LET p_CALL 	= Null();
+
+DROP Field Period From tTP_Out;
+
+Left Join (tTP_Out)
+	LOAD Distinct
+		TargetDate
+		,Text(Date(TargetDate,'YYYY')) as TargetInc
+	Resident tTP_Out;
+
+Concatenate(tTP_Out)
+	LOAD
+		Null() as [RN]
+		,Null() as [FN]
+		,Null() as [CUSTOMER CODE]
+		,Null() as [ShipToDeliveryLocationID]
+		,Null() as [PRODUCT NUMBER]
+		,Null() as [CURRENCY]
+		,Null() as [TargetDate]
+		,Null() as [Target_COGS]
+		,Null() as [Target_Volume]
+		,Null() as [Target_Sales]
+	AutoGenerate(0);
+	
+SET p_Table 			= tTP_Out;
+SET p_StoreFieldList 	= [RN],[FN],[CUSTOMER CODE],[ShipToDeliveryLocationID],[PRODUCT NUMBER],[CURRENCY],[TargetDate],[Target_COGS],[Target_Volume],[Target_Sales];
+SET p_IncrementalField 	= [TargetInc];
+SET p_StoreName 		= Target;
+SET p_StartDate 		=  or Num(TargetDate) < $(pStartDate);
+CALL StoreIncremental(p_Table,p_StoreFieldList,p_IncrementalField,p_StoreName)
+LET p_Table 			= Null();
+LET p_StoreFieldList 	= Null();
+LET p_IncrementalField 	= Null();
+LET p_StoreName 		= Null();
+LET p_StartDate			= Null();
+
+CALL DropTable('tTP_Out');
+///$tab Main 6
+//LOAD [CUSTOMER CODE], 
+//     ShipToDeliveryLocationID, 
+//     [PRODUCT NUMBER], 
+//     [2018-07], 
+//     [2018-08], 
+//     [2018-09], 
+//     [2018-10], 
+//     [2018-11], 
+//     [2018-12], 
+//     [2019-01], 
+//     [2019-02], 
+//     [2019-03], 
+//     [2019-04], 
+//     [2019-05], 
+//     [2019-06], 
+//     P, 
+//     Q, 
+//     R
+//FROM
+//[D:\ANQVUAT3License\GIS 2.0 R2018-08 UAT\_SRC\Master\Target FY19\TARGET NA MECH 2019.xlsx]
+//(ooxml, embedded labels, table is VOLUMES);
+//
+///$tab Logs
+
+CALL DelLog ('$(vLOGPath)','$(vLogDocPrefixName)',$(vLogCountSaveLoad))
+
+LET vReloadTime = Timestamp(vReloadTime,'YYYYMMDDhhmmss');
+
+LOG:
+LOAD
+	RecNo() as [LOG.RN]
+	,[Module]
+	,[ReloadTime]
+	,[TABLE]
+	,[STATUS]
+	,IF(STATUS = 'WARNING','Line #'&([REC_NO])&' in field ['&[MESSAGE]&'] data was replaced from value "'&FromValue&'" to value "'&ToValue&'"
+	Source file: "'&FN&'"', MESSAGE)	as MESSAGE
+	,REC_NO
+    ,FromValue
+    ,ToValue
+	,if([STATUS] = 'WARNING ON DOUBLES'
+		,'DOUBLES'
+		,TextBetween([MESSAGE],'[',']',1)) as [FILENAME],
+	FN									as [File name]
+FROM
+[$(vLOGPath)$(vLogDocPrefixName)*$(vReloadTime).qvd]
+(qvd)
+//Where Upper([Module]) = Upper(DocumentPath())
+;
+	
+	[Log_Error]:
+	LOAD 	Module,
+			STATUS,
+			//TABLE,
+			COUNT(STATUS) as QtyWorning
+	Resident LOG
+	Where STATUS <> 'FAILURE'
+	Group BY 	Module,
+				STATUS/*,
+				TABLE*/;
+	
+	IF NoOfFields('Log_Error') then	
+		STORE Log_Error into '$(vLOGPath)$(vLogTotalPrefixName)Error_$(vReloadTime).qvd' (qvd);
+		
+		DROP Table Log_Error;
+	ENDIF	
+
+	CALL DelLog ('$(vLOGPath)','$(vLogDocPrefixName)',$(vLogCountSaveLoad))
+	
+		[Log_FAILURE]:
+		NoConcatenate LOAD 	*
+		Resident LOG
+		Where STATUS = 'FAILURE';
+	
+	IF NoOfFields('Log_FAILURE') then	
+		STORE Log_FAILURE into '$(vLOGPath)$(vLogTotalPrefixName)FAILURE_$(vReloadTime).qvd' (qvd);
+		
+		DROP Table Log_FAILURE;
+	ENDIF	
+
+	CALL DelLog ('$(vLOGPath)','$(vLogTotalPrefixName)',$(vLogCountSaveLoad))
+///$tab Mail
+CALL FailuresInTransformMessage('');
+///$tab Exit script
+EXIT SCRIPT;

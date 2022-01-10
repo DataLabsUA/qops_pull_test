@@ -1,0 +1,35 @@
+<Variables>
+  <Variable>
+    <Name>vTables</Name>
+    <Content>
+CALL DropTable('Sales_Shipment.g.201503');
+CALL DropTable('Sales_Shipment.g.201506');
+CALL DropTable('Sales_Shipment.g.201504');
+CALL DropTable('Sales_Shipment.g.201505');
+CALL DropTable('Sales_Shipment.g.201510');
+CALL DropTable('Sales_Shipment.g.201507');
+CALL DropTable('Sales_Shipment.g.201512');
+CALL DropTable('Sales_Shipment.g.201508');
+CALL DropTable('Sales_Shipment.g.201509');
+CALL DropTable('Sales_Shipment.g.201601');
+CALL DropTable('Sales_Shipment.g.201408');
+CALL DropTable('Sales_Shipment.g.201409');
+CALL DropTable('Sales_Shipment.g.201501');
+CALL DropTable('Sales_Shipment.g.201412');
+CALL DropTable('Sales_Shipment.g.201502');
+CALL DropTable('Sales_Shipment.g.201407');
+CALL DropTable('Sales_Shipment.g.201411');
+CALL DropTable('Sales_Shipment.g.201410');
+CALL DropTable('Sales_Shipment.g.201602');
+CALL DropTable('Sales_Shipment.g.201511');
+CALL DropTable('Sales_Shipment.g.201603');
+CALL DropTable('Sales_Shipment.g.201604');
+CALL DropTable('Sales_Shipment.g.201605');
+CALL DropTable('Sales_Shipment.g.201606');
+CALL DropTable('Sales_Shipment.g.201607');
+CALL DropTable('Sales_Shipment.g.201608');
+CALL DropTable('Sales_Shipment.g.201609');
+CALL DropTable('Sales_Shipment.g.201610');
+CALL DropTable('Sales_Shipment.g.201611');</Content>
+  </Variable>
+</Variables>

@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>eEmptyCheck</Name>
+    <Content>if(Alt(Len($1),0)=0,$2,$1)</Content>
+  </Variable>
+</Variables>

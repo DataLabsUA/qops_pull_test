@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vLogRetentionPeriod</Name>
+    <Content>2</Content>
+  </Variable>
+</Variables>

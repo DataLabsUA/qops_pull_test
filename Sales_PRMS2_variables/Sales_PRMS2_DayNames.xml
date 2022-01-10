@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>DayNames</Name>
+    <Content>Mon;Tue;Wed;Thu;Fri;Sat;Sun</Content>
+  </Variable>
+</Variables>

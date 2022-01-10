@@ -1,0 +1,6 @@
+<Variables>
+  <Variable>
+    <Name>vLogsFolder</Name>
+    <Content>.\ForecastReloadLogs</Content>
+  </Variable>
+</Variables>
